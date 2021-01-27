@@ -122,9 +122,9 @@ func ReadOrCreate(fname string) (bool, error) {
 			Bands[15] = Band{Low: 21000000, High: 21450000, RadioRFPower: RadioRFPower{Standby: 100, Operate: 30}}
 			Bands[17] = Band{Low: 18068000, High: 18168000, RadioRFPower: RadioRFPower{Standby: 100, Operate: 30}}
 			Bands[20] = Band{Low: 14000000, High: 14350000, RadioRFPower: RadioRFPower{Standby: 100, Operate: 30}}
-			Bands[30] = Band{Low: 10100000, High: 10150000, RadioRFPower: RadioRFPower{Standby: 100, Operate: 15}}
+			Bands[30] = Band{Low: 10100000, High: 10150000, RadioRFPower: RadioRFPower{Standby: 100, Operate: 10}}
 			Bands[40] = Band{Low: 7000000, High: 7300000, RadioRFPower: RadioRFPower{Standby: 100, Operate: 30}}
-			Bands[60] = Band{Low: 5240000, High: 5500000, RadioRFPower: RadioRFPower{Standby: 100, Operate: 30}}
+			Bands[60] = Band{Low: 5240000, High: 5500000, RadioRFPower: RadioRFPower{Standby: 100, Operate: 5}}
 			Bands[80] = Band{Low: 3500000, High: 4000000, RadioRFPower: RadioRFPower{Standby: 100, Operate: 30}}
 			Bands[160] = Band{Low: 1800000, High: 2000000, RadioRFPower: RadioRFPower{Standby: 100, Operate: 30}}
 
