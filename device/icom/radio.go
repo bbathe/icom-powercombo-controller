@@ -148,8 +148,7 @@ func (r *Radio) GetFrequency() (int64, error) {
 		// convert to number
 		freq, err := strconv.ParseInt(fd, 10, 64)
 		if err != nil {
-			log.Printf("%+v", err)
-			return 0, err
+			return -1, nil
 		}
 
 		return freq, nil
