@@ -116,3 +116,52 @@ func (k *KAT500) GetFault() (int, error) {
 		}
 	}
 }
+
+// GetVSWR gets the currentVoltage Standing Wave Ratio from the KAT500
+func (k *KAT500) GetVSWR() (float64, error) {
+	k.mutexPort.Lock()
+	defer k.mutexPort.Unlock()
+
+	// request current VSWR
+	err := writeMessageToPort(k.p, "VSWR;")
+	if k.closed.IsTrue() {
+		return 0, nil
+	}
+	if err != nil {
+		log.Printf("%+v", err)
+		return 0, err
+	}
+
+	// read response from kat500
+	for {
+		msg, err := readMessageFromPort(k.p)
+		if k.closed.IsTrue() {
+			return 0, nil
+		}
+		if err != nil {
+			log.Printf("%+v", err)
+			return 0, err
+		}
+
+		// our response?
+		if strings.HasPrefix(msg, "VSWR") {
+			// RSP format: VSWR nn.nn;
+			s := strings.TrimPrefix(msg, "VSWR ")
+			s = strings.TrimSuffix(s, ";")
+
+			if len(s) == 0 {
+				// no response, kat500 disconnected?
+				return 0, nil
+			}
+
+			// convert to number
+			vswr, err := strconv.ParseFloat(s, 64)
+			if err != nil {
+				log.Printf("%+v", err)
+				return 0, err
+			}
+
+			return vswr, nil
+		}
+	}
+}

@@ -39,7 +39,7 @@ func MainWindow() error {
 		sKPA500Mode *walk.Slider
 		tlStandby   *walk.TextLabel
 		tlOperate   *walk.TextLabel
-		tlPower     *walk.TextLabel
+		tlData      *walk.TextLabel
 	)
 
 	// load app icon
@@ -165,7 +165,7 @@ func MainWindow() error {
 						Children: []declarative.Widget{
 							declarative.HSpacer{},
 							declarative.TextLabel{
-								AssignTo: &tlPower,
+								AssignTo: &tlData,
 							},
 							declarative.HSpacer{},
 						},
@@ -182,7 +182,7 @@ func MainWindow() error {
 
 	// update controls with data from devices
 	hDataChangeHandler = data.Attach(func(d data.Data) {
-		err := tlPower.SetText(fmt.Sprintf("%3d watts", d.KPA500.Power))
+		err := tlData.SetText(fmt.Sprintf("%d w / %.2f vswr", d.KPA500.Power, d.KAT500.VSWR))
 		if err != nil {
 			log.Printf("%+v", err)
 		}

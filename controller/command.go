@@ -165,6 +165,16 @@ func (c *command) getKAT500InFault() (bool, error) {
 	return (fault != 0), nil
 }
 
+func (c *command) getKAT500VSWR() (float64, error) {
+	vswr, err := c.kat.GetVSWR()
+	if err != nil {
+		log.Printf("%+v", err)
+		return 0, err
+	}
+
+	return vswr, nil
+}
+
 func (c *command) getKPA500InFault() (bool, error) {
 	fault, err := c.kpa.GetFault()
 	if err != nil {

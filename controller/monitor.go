@@ -66,8 +66,21 @@ func newMonitor() *monitor {
 			return
 		}
 
+		// get current vswr
+		v, err := controller.c.getKAT500VSWR()
+		if err != nil {
+			log.Printf("%+v", err)
+			status.SetStatus(status.SystemStatusKAT500, status.StatusFailed)
+			return
+		}
+
+		// update state with what we know
+		data.KAT500{
+			VSWR: v,
+		}.Update()
+
 		status.SetStatus(status.SystemStatusKAT500, status.StatusOK)
-	}, 5*time.Second)
+	}, 3*time.Second)
 
 	// KPA500 monitor task
 	m.qKPA500 = util.ScheduleRecurring(func() {
@@ -101,7 +114,7 @@ func newMonitor() *monitor {
 		}.Update()
 
 		status.SetStatus(status.SystemStatusKPA500, status.StatusOK)
-	}, 5*time.Second)
+	}, 3*time.Second)
 
 	// the main monitor loop
 	// this keeps the KAT500 & KPA500 in-sync with the frequency on the radio

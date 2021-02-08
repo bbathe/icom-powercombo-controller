@@ -14,9 +14,14 @@ type KPA500 struct {
 	Power int
 }
 
+type KAT500 struct {
+	VSWR float64
+}
+
 type Data struct {
 	Radio
 	KPA500
+	KAT500
 }
 
 // allow callers to register to recieve event after any change occurs
@@ -26,6 +31,7 @@ var (
 	mutexData sync.Mutex
 	radio     Radio
 	kpa500    KPA500
+	kat500    KAT500
 
 	dataChangedHandlers []DataChangeEventHandler
 )
@@ -53,6 +59,7 @@ func publishDataChange() {
 			go h(Data{
 				Radio:  radio,
 				KPA500: kpa500,
+				KAT500: kat500,
 			})
 		}
 	}
@@ -85,6 +92,19 @@ func (kd KPA500) Update() {
 	}
 	if kd.Power > -1 {
 		kpa500.Power = kd.Power
+	}
+
+	publishDataChange()
+}
+
+// update shared state about the KAT500
+// pass -1 for any data that shouldn't be updated
+func (kd KAT500) Update() {
+	mutexData.Lock()
+	defer mutexData.Unlock()
+
+	if kd.VSWR > -1 {
+		kat500.VSWR = kd.VSWR
 	}
 
 	publishDataChange()
