@@ -32,8 +32,8 @@ var (
 func OpenRadio(port string, baud int, address string) (*Radio, error) {
 	p, err := serial.Open(port,
 		serial.WithBaudrate(baud),
-		serial.WithReadTimeout(1000),
-		serial.WithWriteTimeout(1000),
+		serial.WithReadTimeout(333),
+		serial.WithWriteTimeout(333),
 	)
 	if err != nil {
 		log.Printf("%+v", err)

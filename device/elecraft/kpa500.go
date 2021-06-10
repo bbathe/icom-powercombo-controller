@@ -42,8 +42,8 @@ var (
 func OpenKPA500(port string, baud int) (*KPA500, error) {
 	p, err := serial.Open(port,
 		serial.WithBaudrate(baud),
-		serial.WithReadTimeout(1000),
-		serial.WithWriteTimeout(1000),
+		serial.WithReadTimeout(333),
+		serial.WithWriteTimeout(333),
 	)
 	if err != nil {
 		log.Printf("%+v", err)
