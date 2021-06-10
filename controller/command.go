@@ -175,6 +175,16 @@ func (c *command) getKAT500VSWR() (float64, error) {
 	return vswr, nil
 }
 
+func (c *command) KAT500FullTune() error {
+	err := c.kat.FullTune()
+	if err != nil {
+		log.Printf("%+v", err)
+		return err
+	}
+
+	return nil
+}
+
 func (c *command) getKPA500InFault() (bool, error) {
 	fault, err := c.kpa.GetFault()
 	if err != nil {
@@ -184,6 +194,7 @@ func (c *command) getKPA500InFault() (bool, error) {
 
 	return (fault != 0), nil
 }
+
 func (c *command) getKPA500Power() (int, error) {
 	power, err := c.kpa.GetPower()
 	if err != nil {

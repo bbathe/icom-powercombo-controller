@@ -165,3 +165,35 @@ func (k *KAT500) GetVSWR() (float64, error) {
 		}
 	}
 }
+
+func (k *KAT500) FullTune() error {
+	k.mutexPort.Lock()
+	defer k.mutexPort.Unlock()
+
+	// request full tune
+	err := writeMessageToPort(k.p, "T;")
+	if k.closed.IsTrue() {
+		return nil
+	}
+	if err != nil {
+		log.Printf("%+v", err)
+		return err
+	}
+
+	// read response from kat500
+	for {
+		msg, err := readMessageFromPort(k.p)
+		if k.closed.IsTrue() {
+			return nil
+		}
+		if err != nil {
+			log.Printf("%+v", err)
+			return err
+		}
+
+		// our response?
+		if msg == "FT;" {
+			return nil
+		}
+	}
+}

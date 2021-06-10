@@ -20,14 +20,40 @@ import (
 )
 
 var (
-	appName = "icom-powercombo-controller"
-	appIcon *walk.Icon
+	appName     = "icom-powercombo-controller"
+	appIcon     *walk.Icon
+	fontBold    *walk.Font
+	fontNotBold *walk.Font
 
 	mutexCtrl sync.Mutex
 	ctrl      *controller.Controller
 
 	hDataChangeHandler int
 )
+
+func init() {
+	var err error
+
+	// load app icon
+	appIcon, err = walk.Resources.Icon("2")
+	if err != nil {
+		log.Printf("%+v", err)
+		return
+	}
+
+	// fonts
+	fontBold, err = walk.NewFont("MS Shell Dlg 2", 10, walk.FontBold)
+	if err != nil {
+		log.Printf("%+v", err)
+		return
+	}
+
+	fontNotBold, err = walk.NewFont("MS Shell Dlg 2", 10, 0)
+	if err != nil {
+		log.Printf("%+v", err)
+		return
+	}
+}
 
 // MainWindow finishes initialization and gets everything going
 func MainWindow() error {
@@ -41,26 +67,6 @@ func MainWindow() error {
 		tlOperate   *walk.TextLabel
 		tlData      *walk.TextLabel
 	)
-
-	// load app icon
-	appIcon, err = walk.Resources.Icon("2")
-	if err != nil {
-		log.Printf("%+v", err)
-		return err
-	}
-
-	// fonts
-	fontBold, err := walk.NewFont("MS Shell Dlg 2", 10, walk.FontBold)
-	if err != nil {
-		log.Printf("%+v", err)
-		return err
-	}
-
-	fontNotBold, err := walk.NewFont("MS Shell Dlg 2", 10, 0)
-	if err != nil {
-		log.Printf("%+v", err)
-		return err
-	}
 
 	// our main window
 	err = declarative.MainWindow{
@@ -80,6 +86,20 @@ func MainWindow() error {
 					sKPA500Mode.SetValue(0)
 
 					updateConfig(mainWin, configFile)
+				},
+			},
+			declarative.Action{
+				Text: "&Initiate Full Tune",
+				OnTriggered: func() {
+					if ctrl != nil {
+						MsgBusyWithTask(mainWin, "Tune in progress...", func() {
+							err := ctrl.KAT500FullTune()
+							if err != nil {
+								log.Printf("%+v", err)
+								return
+							}
+						})
+					}
 				},
 			},
 		},

@@ -22,6 +22,25 @@ var (
 	hStatusChangeEventHandler int
 )
 
+func init() {
+	var err error
+
+	imgOK, err = walk.NewIconFromImageForDPI(generateStatusImage(color.RGBA{R: 34, G: 139, B: 34, A: 255}), 96)
+	if err != nil {
+		log.Printf("%+v", err)
+	}
+
+	imgFailed, err = walk.NewIconFromImageForDPI(generateStatusImage(color.RGBA{R: 237, G: 28, B: 36, A: 255}), 96)
+	if err != nil {
+		log.Printf("%+v", err)
+	}
+
+	imgUnknown, err = walk.NewIconFromImageForDPI(generateStatusImage(color.RGBA{R: 128, G: 128, B: 128, A: 255}), 96)
+	if err != nil {
+		log.Printf("%+v", err)
+	}
+}
+
 // statusImage returns the image to use for status based on StatusValue
 func statusImage(s status.StatusValue) walk.Image {
 	switch s {
@@ -63,23 +82,6 @@ func updateStatuses(statuses []status.StatusValue) {
 
 // statusBar returns a Composite that has all the controls & logic for displaying status on the main UI
 func statusBar() declarative.Composite {
-	var err error
-
-	imgOK, err = walk.NewIconFromImageForDPI(generateStatusImage(color.RGBA{R: 34, G: 139, B: 34, A: 255}), 96)
-	if err != nil {
-		log.Printf("%+v", err)
-	}
-
-	imgFailed, err = walk.NewIconFromImageForDPI(generateStatusImage(color.RGBA{R: 237, G: 28, B: 36, A: 255}), 96)
-	if err != nil {
-		log.Printf("%+v", err)
-	}
-
-	imgUnknown, err = walk.NewIconFromImageForDPI(generateStatusImage(color.RGBA{R: 128, G: 128, B: 128, A: 255}), 96)
-	if err != nil {
-		log.Printf("%+v", err)
-	}
-
 	c := declarative.Composite{
 		Layout: declarative.HBox{MarginsZero: true},
 		Children: []declarative.Widget{

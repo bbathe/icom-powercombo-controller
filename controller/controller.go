@@ -38,3 +38,8 @@ func (c *Controller) Close() {
 func (c *Controller) SetKPA500Mode(mode int) error {
 	return c.c.setKPA500Mode(mode)
 }
+
+// KAT500FullTune initiates a full tune on the KAT500
+func (c *Controller) KAT500FullTune() error {
+	return c.c.KAT500FullTune()
+}
