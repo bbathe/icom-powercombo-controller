@@ -334,19 +334,18 @@ func tabConfigBandPower() declarative.TabPage {
 		Children: []declarative.Widget{
 			declarative.HSpacer{},
 			declarative.Label{
-				Text:          "Band",
-				MinSize:       declarative.Size{Width: 50},
-				TextAlignment: declarative.AlignFar,
+				Text:    "Band",
+				MinSize: declarative.Size{Width: 40},
 			},
 			declarative.HSpacer{},
 			declarative.Label{
-				Text:    "KPA500 Standby",
-				MinSize: declarative.Size{Width: 75},
+				Text:    "Standby",
+				MinSize: declarative.Size{Width: 90},
 			},
 			declarative.HSpacer{},
 			declarative.Label{
-				Text:    "KPA500 Operate",
-				MinSize: declarative.Size{Width: 75},
+				Text:    "Operate",
+				MinSize: declarative.Size{Width: 70},
 			},
 			declarative.HSpacer{},
 		},
