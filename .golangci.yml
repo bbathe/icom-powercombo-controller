@@ -1,6 +1,6 @@
 linters-settings:
   gocyclo:
-    min-complexity: 20
+    min-complexity: 25
   nakedret:
     max-func-lines: 1
 linters:
