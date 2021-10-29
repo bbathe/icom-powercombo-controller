@@ -66,6 +66,8 @@ func MainWindow() error {
 		tlStandby   *walk.TextLabel
 		tlOperate   *walk.TextLabel
 		tlData      *walk.TextLabel
+
+		actTrackKAT500 *walk.Action
 	)
 
 	// our main window
@@ -99,6 +101,28 @@ func MainWindow() error {
 								return
 							}
 						})
+					}
+				},
+			},
+			declarative.Action{
+				AssignTo: &actTrackKAT500,
+				Text:     "&Track KAT500",
+				Checked:  true,
+				OnTriggered: func() {
+					if ctrl != nil {
+						// flip action controller takes on frequency changes
+						if actTrackKAT500.Checked() {
+							ctrl.SetTrackKAT500(false)
+						} else {
+							ctrl.SetTrackKAT500(true)
+						}
+
+						// flip checked indicator
+						err := actTrackKAT500.SetChecked(!actTrackKAT500.Checked())
+						if err != nil {
+							log.Printf("%+v", err)
+							return
+						}
 					}
 				},
 			},

@@ -20,6 +20,8 @@ type monitor struct {
 
 	freq int64
 	band int
+
+	trackKAT500 bool
 }
 
 func (m *monitor) close() {
@@ -42,6 +44,7 @@ func newMonitor() *monitor {
 
 	m := new(monitor)
 	m.r = r
+	m.trackKAT500 = true
 
 	err = m.initializeDevices()
 	if err != nil {
@@ -116,79 +119,83 @@ func newMonitor() *monitor {
 		status.SetStatus(status.SystemStatusKPA500, status.StatusOK)
 	}, 3*time.Second)
 
-	// the main monitor loop
-	// this keeps the KAT500 & KPA500 in-sync with the frequency on the radio
+	// kick off monitor loop
 	m.quit = make(chan bool)
-	go func() {
-		// while not quit
-		for {
-			select {
-			case <-m.quit:
+	go m.monitorRadio()
+
+	return m
+}
+
+// monitorRadio keeps the KAT500 & KPA500 in-sync with the frequency on the radio
+func (m *monitor) monitorRadio() {
+	// while not quit
+	for {
+		select {
+		case <-m.quit:
+			return
+		default:
+			f, err := m.r.GetFrequency()
+			if err != nil {
+				log.Printf("%+v", err)
+				status.SetStatus(status.SystemStatusRadio, status.StatusFailed)
 				return
-			default:
-				f, err := m.r.GetFrequency()
-				if err != nil {
-					log.Printf("%+v", err)
-					status.SetStatus(status.SystemStatusRadio, status.StatusFailed)
-					return
-				}
-				status.SetStatus(status.SystemStatusRadio, status.StatusOK)
+			}
+			status.SetStatus(status.SystemStatusRadio, status.StatusOK)
 
-				// no update or no frequency change?
-				if f < 0 || f == m.freq {
-					continue
-				}
+			// no update or no frequency change?
+			if f < 0 || f == m.freq {
+				continue
+			}
 
-				m.freq = f
+			m.freq = f
 
-				b, err := util.BandFromFrequency(f)
-				if err != nil {
-					continue
-				}
+			b, err := util.BandFromFrequency(f)
+			if err != nil {
+				continue
+			}
 
-				// update state
-				data.Radio{
-					Frequency: f,
-					Band:      b,
-				}.Update()
+			// update state
+			data.Radio{
+				Frequency: f,
+				Band:      b,
+			}.Update()
 
-				//
-				// coordinated frequency change across all devices
-				//
+			//
+			// coordinated frequency change across all devices
+			//
 
-				// update kat500 frequency
+			// update kat500 frequency
+			if m.trackKAT500 {
 				err = controller.c.updateKAT500Frequency()
 				if err != nil {
 					log.Printf("%+v", err)
 					status.SetStatus(status.SystemStatusKAT500, status.StatusFailed)
 					continue
 				}
+			}
 
-				// band change?
-				if b != m.band {
-					m.band = b
+			// band change?
+			if b != m.band {
+				m.band = b
 
-					// update kpa500 band
-					err = controller.c.updateKPA500Band()
-					if err != nil {
-						log.Printf("%+v", err)
-						status.SetStatus(status.SystemStatusKPA500, status.StatusFailed)
-						continue
-					}
+				// update kpa500 band
+				err = controller.c.updateKPA500Band()
+				if err != nil {
+					log.Printf("%+v", err)
+					status.SetStatus(status.SystemStatusKPA500, status.StatusFailed)
+					continue
+				}
 
-					// update radio rf power
-					err = controller.c.updateRadioRFPower()
-					if err != nil {
-						log.Printf("%+v", err)
-						status.SetStatus(status.SystemStatusRadio, status.StatusFailed)
-						continue
-					}
+				// update radio rf power
+				err = controller.c.updateRadioRFPower()
+				if err != nil {
+					log.Printf("%+v", err)
+					status.SetStatus(status.SystemStatusRadio, status.StatusFailed)
+					continue
 				}
 			}
 		}
-	}()
-
-	return m
+	}
 }
 
 // initializeDevices makes sure the internal state is consistent with external devices

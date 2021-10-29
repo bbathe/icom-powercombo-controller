@@ -43,3 +43,8 @@ func (c *Controller) SetKPA500Mode(mode int) error {
 func (c *Controller) KAT500FullTune() error {
 	return c.c.KAT500FullTune()
 }
+
+// SetTrackKAT500 indictes whether frequency information should be sent to the KAT500
+func (c *Controller) SetTrackKAT500(t bool) {
+	c.m.trackKAT500 = t
+}
