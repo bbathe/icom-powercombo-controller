@@ -78,6 +78,14 @@ func updateStatuses(statuses []status.StatusValue) {
 			return
 		}
 	}
+
+	// flash window if any status is failed
+	for _, s := range statuses {
+		if s == status.StatusFailed {
+			flashWindow(mainWin, 3)
+		}
+	}
+
 }
 
 // statusBar returns a Composite that has all the controls & logic for displaying status on the main UI

@@ -17,13 +17,19 @@ import (
 	"github.com/lxn/walk"
 	"github.com/lxn/walk/declarative"
 	"github.com/lxn/win"
+	"golang.org/x/sys/windows"
 )
 
 var (
+	mainWin *walk.MainWindow
+
 	appName     = "icom-powercombo-controller"
 	appIcon     *walk.Icon
 	fontBold    *walk.Font
 	fontNotBold *walk.Font
+
+	runDll32      string
+	flashWindowEx *windows.Proc
 
 	mutexCtrl sync.Mutex
 	ctrl      *controller.Controller
@@ -53,6 +59,18 @@ func init() {
 		log.Printf("%+v", err)
 		return
 	}
+
+	// full path to rundll32
+	runDll32 = filepath.Join(os.Getenv("SYSTEMROOT"), "System32", "rundll32.exe")
+	winuserDll, err := windows.LoadDLL("User32.dll")
+	if err != nil {
+		log.Fatalf("%+v", err)
+	}
+
+	flashWindowEx, err = winuserDll.FindProc("FlashWindowEx")
+	if err != nil {
+		log.Fatalf("%+v", err)
+	}
 }
 
 // MainWindow finishes initialization and gets everything going
@@ -60,7 +78,6 @@ func MainWindow() error {
 	var (
 		err        error
 		configFile string
-		mainWin    *walk.MainWindow
 
 		sKPA500Mode *walk.Slider
 		tlStandby   *walk.TextLabel
