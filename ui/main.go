@@ -28,7 +28,6 @@ var (
 	fontBold    *walk.Font
 	fontNotBold *walk.Font
 
-	runDll32      string
 	flashWindowEx *windows.Proc
 
 	mutexCtrl sync.Mutex
@@ -60,8 +59,7 @@ func init() {
 		return
 	}
 
-	// full path to rundll32
-	runDll32 = filepath.Join(os.Getenv("SYSTEMROOT"), "System32", "rundll32.exe")
+	// get to FlashWindowEx
 	winuserDll, err := windows.LoadDLL("User32.dll")
 	if err != nil {
 		log.Fatalf("%+v", err)
