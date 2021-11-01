@@ -83,6 +83,7 @@ func updateStatuses(statuses []status.StatusValue) {
 	for _, s := range statuses {
 		if s == status.StatusFailed {
 			flashWindow(mainWin, 3)
+			break
 		}
 	}
 
