@@ -127,6 +127,10 @@ func (k *KPA500) GetPower() (int, error) {
 			log.Printf("%+v", err)
 			return 0, err
 		}
+		if msg == "" {
+			// no response, kpa500 disconnected?
+			return 0, nil
+		}
 
 		// our response?
 		if strings.HasPrefix(msg, "^WS") {
@@ -178,6 +182,10 @@ func (k *KPA500) GetFault() (int, error) {
 		if err != nil {
 			log.Printf("%+v", err)
 			return 0, err
+		}
+		if msg == "" {
+			// no response, kpa500 disconnected?
+			return 255, nil
 		}
 
 		// our response?

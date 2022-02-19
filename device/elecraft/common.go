@@ -23,11 +23,15 @@ func readMessageFromPort(p *serial.Port) (string, error) {
 
 			// message terminator?
 			if b[0] == ';' {
-				// return  message
-				return buf.String(), nil
+				break
 			}
+		} else {
+			break
 		}
 	}
+
+	// return message
+	return buf.String(), nil
 }
 
 // writeMessageToPort writes a KPA500/KAT500 formatted message to port p

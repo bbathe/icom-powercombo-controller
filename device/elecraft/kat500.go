@@ -93,6 +93,10 @@ func (k *KAT500) GetFault() (int, error) {
 			log.Printf("%+v", err)
 			return 0, err
 		}
+		if msg == "" {
+			// no response, kat500 disconnected?
+			return 255, nil
+		}
 
 		// our response?
 		if strings.HasPrefix(msg, "FLT") {
@@ -142,6 +146,10 @@ func (k *KAT500) GetVSWR() (float64, error) {
 			log.Printf("%+v", err)
 			return 0, err
 		}
+		if msg == "" {
+			// no response, kat500 disconnected?
+			return 0, nil
+		}
 
 		// our response?
 		if strings.HasPrefix(msg, "VSWR") {
@@ -189,6 +197,10 @@ func (k *KAT500) FullTune() error {
 		if err != nil {
 			log.Printf("%+v", err)
 			return err
+		}
+		if msg == "" {
+			// no response, kat500 disconnected?
+			return nil
 		}
 
 		// our response?
