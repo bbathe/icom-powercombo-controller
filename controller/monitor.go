@@ -83,7 +83,7 @@ func newMonitor() *monitor {
 		}.Update()
 
 		status.SetStatus(status.SystemStatusKAT500, status.StatusOK)
-	}, 3*time.Second)
+	}, 1*time.Second)
 
 	// KPA500 monitor task
 	m.qKPA500 = util.ScheduleRecurring(func() {
@@ -117,7 +117,7 @@ func newMonitor() *monitor {
 		}.Update()
 
 		status.SetStatus(status.SystemStatusKPA500, status.StatusOK)
-	}, 3*time.Second)
+	}, 1*time.Second)
 
 	// kick off monitor loop
 	m.quit = make(chan bool)
