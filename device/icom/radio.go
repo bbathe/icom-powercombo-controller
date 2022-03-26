@@ -83,8 +83,13 @@ func (r *Radio) readCIVMessageFromPort() ([]byte, error) {
 				// return CIV message
 				return buf.Bytes(), nil
 			}
+		} else {
+			break
 		}
 	}
+
+	// return message
+	return buf.Bytes(), nil
 }
 
 // writeCIVMessageToPort write byte equalivalent of msg to port
