@@ -114,8 +114,10 @@ func (c *command) setKPA500Mode(mode int) error {
 
 	// update state
 	data.KPA500{
-		Mode:  mode,
-		Power: -1,
+		Mode:    mode,
+		Power:   -1,
+		PAVolts: -1,
+		PAAmps:  -1,
 	}.Update()
 
 	if kpa.Mode > mode {
