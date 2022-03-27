@@ -210,3 +210,65 @@ func (k *KPA500) GetFault() (int, error) {
 		}
 	}
 }
+
+// GetPAVoltsCurrent gets the PA Voltage and Current from the KPA500
+func (k *KPA500) GetPAVoltsCurrent() (float64, float64, error) {
+	k.mutexPort.Lock()
+	defer k.mutexPort.Unlock()
+
+	// request pa volts & current
+	err := writeMessageToPort(k.p, "^VI;")
+	if k.closed.IsTrue() {
+		return 0.0, 0.0, nil
+	}
+	if err != nil {
+		log.Printf("%+v", err)
+		return 0.0, 0.0, nil
+	}
+
+	// read response from kpa500
+	for {
+		msg, err := readMessageFromPort(k.p)
+		if k.closed.IsTrue() {
+			return 0.0, 0.0, nil
+		}
+		if err != nil {
+			log.Printf("%+v", err)
+			return 0.0, 0.0, nil
+		}
+		if msg == "" {
+			// no response, kpa500 disconnected?
+			return 0.0, 0.0, nil
+		}
+
+		// our response?
+		if strings.HasPrefix(msg, "^VI") {
+			// RSP format:  ^VIvvv iii; where vvv = the PA voltage with range 00.0 - 99.9 volts, and iii = PA current with range of 00.0 - 99.9 amps
+			s := strings.TrimPrefix(msg, "^VI")
+			s = strings.TrimSuffix(s, ";")
+
+			if len(s) == 0 {
+				// no response, kpa500 disconnected?
+				return 0.0, 0.0, nil
+			}
+
+			ss := strings.Split(s, " ")
+			v := ss[0][:2] + "." + ss[0][2:]
+			a := ss[1][:2] + "." + ss[1][2:]
+
+			// convert to floats
+			volts, err := strconv.ParseFloat(v, 64)
+			if err != nil {
+				log.Printf("%+v", err)
+				return 0.0, 0.0, nil
+			}
+			amps, err := strconv.ParseFloat(a, 64)
+			if err != nil {
+				log.Printf("%+v", err)
+				return 0.0, 0.0, nil
+			}
+
+			return volts, amps, nil
+		}
+	}
+}

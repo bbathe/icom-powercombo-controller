@@ -204,3 +204,13 @@ func (c *command) getKPA500Power() (int, error) {
 
 	return power, nil
 }
+
+func (c *command) getKPA500PAVoltsCurrent() (float64, float64, error) {
+	volts, amps, err := c.kpa.GetPAVoltsCurrent()
+	if err != nil {
+		log.Printf("%+v", err)
+		return 0.0, 0.0, err
+	}
+
+	return volts, amps, nil
+}

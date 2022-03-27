@@ -10,8 +10,10 @@ type Radio struct {
 }
 
 type KPA500 struct {
-	Mode  int
-	Power int
+	Mode    int
+	Power   int
+	PAVolts float64
+	PAAmps  float64
 }
 
 type KAT500 struct {
@@ -92,6 +94,12 @@ func (kd KPA500) Update() {
 	}
 	if kd.Power > -1 {
 		kpa500.Power = kd.Power
+	}
+	if kd.PAVolts > -1 {
+		kpa500.PAVolts = kd.PAVolts
+	}
+	if kd.PAAmps > -1 {
+		kpa500.PAAmps = kd.PAAmps
 	}
 
 	publishDataChange()

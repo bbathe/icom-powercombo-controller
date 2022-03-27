@@ -80,7 +80,10 @@ func MainWindow() error {
 		sKPA500Mode *walk.Slider
 		tlStandby   *walk.TextLabel
 		tlOperate   *walk.TextLabel
-		tlData      *walk.TextLabel
+		tlWatts     *walk.TextLabel
+		tlVolts     *walk.TextLabel
+		tlAmps      *walk.TextLabel
+		tlVSWR      *walk.TextLabel
 
 		actTrackKAT500 *walk.Action
 	)
@@ -166,7 +169,7 @@ func MainWindow() error {
 						Children: []declarative.Widget{
 							declarative.Slider{
 								AssignTo:       &sKPA500Mode,
-								MinSize:        declarative.Size{Height: 60},
+								MinSize:        declarative.Size{Height: 48},
 								MaxValue:       1,
 								MinValue:       0,
 								ToolTipsHidden: true,
@@ -215,18 +218,32 @@ func MainWindow() error {
 						},
 					},
 					declarative.Composite{
-						Layout: declarative.HBox{
-							Margins: declarative.Margins{
-								Top:    4,
-								Bottom: 5,
-							},
-						},
+						Layout: declarative.VBox{MarginsZero: true},
 						Children: []declarative.Widget{
-							declarative.HSpacer{},
-							declarative.TextLabel{
-								AssignTo: &tlData,
+							declarative.Composite{
+								Layout: declarative.HBox{MarginsZero: true},
+								Children: []declarative.Widget{
+									declarative.TextLabel{
+										AssignTo: &tlWatts,
+									},
+									declarative.TextLabel{
+										AssignTo: &tlVolts,
+									},
+									declarative.TextLabel{
+										AssignTo: &tlAmps,
+									},
+								},
 							},
-							declarative.HSpacer{},
+							declarative.Composite{
+								Layout: declarative.HBox{MarginsZero: true},
+								Children: []declarative.Widget{
+									declarative.HSpacer{},
+									declarative.TextLabel{
+										AssignTo: &tlVSWR,
+									},
+									declarative.HSpacer{},
+								},
+							},
 						},
 					},
 				},
@@ -241,7 +258,19 @@ func MainWindow() error {
 
 	// update controls with data from devices
 	hDataChangeHandler = data.Attach(func(d data.Data) {
-		err := tlData.SetText(fmt.Sprintf("%d w / %.2f vswr", d.KPA500.Power, d.KAT500.VSWR))
+		err := tlWatts.SetText(fmt.Sprintf("%d w", d.KPA500.Power))
+		if err != nil {
+			log.Printf("%+v", err)
+		}
+		err = tlVolts.SetText(fmt.Sprintf("%.1f v", d.KPA500.PAVolts))
+		if err != nil {
+			log.Printf("%+v", err)
+		}
+		err = tlAmps.SetText(fmt.Sprintf("%.1f a", d.KPA500.PAAmps))
+		if err != nil {
+			log.Printf("%+v", err)
+		}
+		err = tlVSWR.SetText(fmt.Sprintf("%.2f vswr", d.KAT500.VSWR))
 		if err != nil {
 			log.Printf("%+v", err)
 		}

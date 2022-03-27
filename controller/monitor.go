@@ -110,10 +110,20 @@ func newMonitor() *monitor {
 			return
 		}
 
+		// get pa volts & amps
+		v, a, err := controller.c.getKPA500PAVoltsCurrent()
+		if err != nil {
+			log.Printf("%+v", err)
+			status.SetStatus(status.SystemStatusKPA500, status.StatusFailed)
+			return
+		}
+
 		// update state with what we know
 		data.KPA500{
-			Mode:  -1,
-			Power: p,
+			Mode:    -1,
+			Power:   p,
+			PAVolts: v,
+			PAAmps:  a,
 		}.Update()
 
 		status.SetStatus(status.SystemStatusKPA500, status.StatusOK)
