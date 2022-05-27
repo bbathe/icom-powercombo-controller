@@ -3,8 +3,7 @@ package main
 import (
 	"log"
 	"os"
-	"path"
-	"strings"
+	"path/filepath"
 
 	"github.com/bbathe/icom-powercombo-controller/ui"
 )
@@ -13,13 +12,13 @@ func main() {
 	// show file & location, date & time
 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
 
-	// log file is in the same directory as the executable with the same base name
-	fn, err := os.Executable()
+	// location for log file is in the working directory
+	wd, err := os.Getwd()
 	if err != nil {
 		log.Printf("%+v", err)
 		return
 	}
-	basefn := strings.TrimSuffix(fn, path.Ext(fn))
+	basefn := filepath.Join(wd, "icom-powercombo-controller")
 
 	// log to file
 	f, err := os.OpenFile(basefn+".log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)

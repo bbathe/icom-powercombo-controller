@@ -418,13 +418,14 @@ func determineConfigFile() (string, error) {
 		return cfn, nil
 	}
 
-	// default config file is in the same directory as the executable with the same base name
-	exefn, _ := os.Executable()
-	configFile := strings.TrimSuffix(exefn, path.Ext(exefn)) + ".yaml"
+	// default config file is in the working directory
+	wd, err := os.Getwd()
 	if err != nil {
 		log.Printf("%+v", err)
 		return "", err
 	}
+	configFile := filepath.Join(wd, "icom-powercombo-controller") + ".yaml"
+
 	return configFile, nil
 }
 
