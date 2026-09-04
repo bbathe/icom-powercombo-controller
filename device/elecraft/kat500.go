@@ -1,6 +1,7 @@
 package elecraft
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"strconv"
@@ -81,12 +82,12 @@ func (k *KAT500) GetFault() (int, error) {
 	msg, err := readMatchingMessage(k.p, func(msg string) bool {
 		return strings.HasPrefix(msg, "FLT")
 	}, k.closed.IsTrue)
+	if errors.Is(err, errPortClosed) {
+		return 0, nil
+	}
 	if err != nil {
 		log.Printf("%+v", err)
 		return 0, err
-	}
-	if msg == "" {
-		return 0, nil
 	}
 
 	s := strings.TrimPrefix(msg, "FLT")
@@ -121,12 +122,12 @@ func (k *KAT500) GetVSWR() (float64, error) {
 	msg, err := readMatchingMessage(k.p, func(msg string) bool {
 		return strings.HasPrefix(msg, "VSWR")
 	}, k.closed.IsTrue)
+	if errors.Is(err, errPortClosed) {
+		return 0, nil
+	}
 	if err != nil {
 		log.Printf("%+v", err)
 		return 0, err
-	}
-	if msg == "" {
-		return 0, nil
 	}
 
 	s := strings.TrimPrefix(msg, "VSWR ")
@@ -157,15 +158,15 @@ func (k *KAT500) FullTune() error {
 		return err
 	}
 
-	msg, err := readMatchingMessage(k.p, func(msg string) bool {
+	_, err = readMatchingMessage(k.p, func(msg string) bool {
 		return msg == "FT;"
 	}, k.closed.IsTrue)
+	if errors.Is(err, errPortClosed) {
+		return nil
+	}
 	if err != nil {
 		log.Printf("%+v", err)
 		return err
-	}
-	if msg == "" {
-		return nil
 	}
 
 	return nil

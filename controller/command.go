@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"fmt"
 	"log"
 
 	"github.com/bbathe/icom-powercombo-controller/config"
@@ -180,9 +179,6 @@ func (c *command) getKAT500InFault() (bool, error) {
 		log.Printf("%+v", err)
 		return false, err
 	}
-	if fault == 255 {
-		return false, fmt.Errorf("KAT500 not responding")
-	}
 
 	return (fault != 0), nil
 }
@@ -212,9 +208,6 @@ func (c *command) getKPA500InFault() (bool, error) {
 	if err != nil {
 		log.Printf("%+v", err)
 		return false, err
-	}
-	if fault == 255 {
-		return false, fmt.Errorf("KPA500 not responding")
 	}
 
 	return (fault != 0), nil

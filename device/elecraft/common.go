@@ -2,6 +2,7 @@ package elecraft
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"time"
 
@@ -12,6 +13,8 @@ const (
 	readTimeout  = 333 * time.Millisecond
 	responseWait = 3 * time.Second
 )
+
+var errPortClosed = errors.New("port closed")
 
 func openSerialPort(name string, baud int) (serial.Port, error) {
 	p, err := serial.Open(name, &serial.Mode{BaudRate: baud})
@@ -60,7 +63,7 @@ func readMatchingMessage(p serial.Port, match func(string) bool, closed func() b
 
 	for time.Now().Before(deadline) {
 		if closed != nil && closed() {
-			return "", nil
+			return "", errPortClosed
 		}
 
 		msg, err := readMessageFromPort(p)

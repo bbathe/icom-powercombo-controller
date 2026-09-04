@@ -1,6 +1,7 @@
 package elecraft
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"strconv"
@@ -115,12 +116,12 @@ func (k *KPA500) GetPower() (int, error) {
 	msg, err := readMatchingMessage(k.p, func(msg string) bool {
 		return strings.HasPrefix(msg, "^WS")
 	}, k.closed.IsTrue)
+	if errors.Is(err, errPortClosed) {
+		return 0, nil
+	}
 	if err != nil {
 		log.Printf("%+v", err)
 		return 0, err
-	}
-	if msg == "" {
-		return 0, nil
 	}
 
 	s := strings.TrimPrefix(msg, "^WS")
@@ -158,12 +159,12 @@ func (k *KPA500) GetFault() (int, error) {
 	msg, err := readMatchingMessage(k.p, func(msg string) bool {
 		return strings.HasPrefix(msg, "^FL")
 	}, k.closed.IsTrue)
+	if errors.Is(err, errPortClosed) {
+		return 0, nil
+	}
 	if err != nil {
 		log.Printf("%+v", err)
 		return 0, err
-	}
-	if msg == "" {
-		return 0, nil
 	}
 
 	s := strings.TrimPrefix(msg, "^FL")
@@ -198,12 +199,12 @@ func (k *KPA500) GetPAVoltsCurrent() (float64, float64, error) {
 	msg, err := readMatchingMessage(k.p, func(msg string) bool {
 		return strings.HasPrefix(msg, "^VI")
 	}, k.closed.IsTrue)
+	if errors.Is(err, errPortClosed) {
+		return 0.0, 0.0, nil
+	}
 	if err != nil {
 		log.Printf("%+v", err)
 		return 0.0, 0.0, err
-	}
-	if msg == "" {
-		return 0.0, 0.0, nil
 	}
 
 	s := strings.TrimPrefix(msg, "^VI")
