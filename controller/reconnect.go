@@ -122,19 +122,6 @@ func (c *Controller) reopenAllPorts() error {
 	return nil
 }
 
-func (c *Controller) withCommand(fn func(*command) error) error {
-	if c == nil {
-		return fmt.Errorf("controller not connected")
-	}
-	c.portsMu.RLock()
-	cmd := c.c
-	c.portsMu.RUnlock()
-	if cmd == nil {
-		return fmt.Errorf("controller not connected")
-	}
-	return fn(cmd)
-}
-
 func (c *Controller) monitorRadioPort() *icom.Radio {
 	if c == nil || c.m == nil {
 		return nil

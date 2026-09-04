@@ -76,7 +76,7 @@ func newMonitor() (*monitor, error) {
 			return
 		}
 
-		err := controller.withCommand(func(cmd *command) error {
+		err := controller.tryPollKAT(func(cmd *command) error {
 			f, err := cmd.getKAT500InFault()
 			if err != nil {
 				return err
@@ -108,7 +108,7 @@ func newMonitor() (*monitor, error) {
 			return
 		}
 
-		err := controller.withCommand(func(cmd *command) error {
+		err := controller.tryPollKPA(func(cmd *command) error {
 			f, err := cmd.getKPA500InFault()
 			if err != nil {
 				return err

@@ -15,6 +15,12 @@ type Controller struct {
 	portsMu      sync.RWMutex
 	reconnectMu  sync.Mutex
 	reconnecting atomic.Bool
+
+	jobs           chan commandJob
+	workerQuit     chan struct{}
+	workerDone     chan struct{}
+	pollKATPending atomic.Bool
+	pollKPAPending atomic.Bool
 }
 
 var (
@@ -34,9 +40,11 @@ func NewController() (*Controller, error) {
 	// monitor init and polls use the package singleton's command side
 	ctrl := &Controller{c: c}
 	controller = ctrl
+	ctrl.startCommandWorker()
 
 	m, err := newMonitor()
 	if err != nil {
+		ctrl.stopCommandWorker()
 		c.close()
 		controller = nil
 		return nil, err
@@ -54,6 +62,8 @@ func (c *Controller) Close() {
 	if c.m != nil {
 		c.m.close()
 	}
+
+	c.stopCommandWorker()
 
 	// wait for any in-progress reconnect to observe quit and exit
 	c.reconnectMu.Lock()
