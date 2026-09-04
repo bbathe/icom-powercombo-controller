@@ -23,34 +23,22 @@ type Controller struct {
 	pollKPAPending atomic.Bool
 }
 
-var (
-	controller *Controller
-)
-
 func NewController() (*Controller, error) {
-	if controller != nil {
-		return controller, nil
-	}
-
 	c, err := newCommand()
 	if err != nil {
 		return nil, err
 	}
 
-	// monitor init and polls use the package singleton's command side
 	ctrl := &Controller{c: c}
-	controller = ctrl
 	ctrl.startCommandWorker()
 
-	m, err := newMonitor()
+	_, err = newMonitor(ctrl)
 	if err != nil {
 		ctrl.stopCommandWorker()
 		c.close()
-		controller = nil
 		return nil, err
 	}
 
-	ctrl.m = m
 	return ctrl, nil
 }
 
@@ -78,8 +66,6 @@ func (c *Controller) Close() {
 	}
 
 	status.SetStatuses(status.StatusUnknown)
-
-	controller = nil
 }
 
 // SetKPA500Mode exposes setting the KPA500 mode (operate/standby) to the UI

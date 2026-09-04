@@ -13,7 +13,8 @@ import (
 )
 
 type monitor struct {
-	r *icom.Radio
+	ctrl *Controller
+	r    *icom.Radio
 
 	quit    chan bool
 	qKAT500 chan bool
@@ -54,7 +55,7 @@ func (m *monitor) close() {
 }
 
 // newMonitor spins off all the seperate processes for monitoring all devices
-func newMonitor() (*monitor, error) {
+func newMonitor(ctrl *Controller) (*monitor, error) {
 	r, err := openMonitorRadio()
 	if err != nil {
 		log.Printf("%+v", err)
@@ -72,6 +73,7 @@ func newMonitor() (*monitor, error) {
 	status.SetStatus(status.SystemStatusRadio, status.StatusOK)
 
 	m := new(monitor)
+	m.ctrl = ctrl
 	m.r = r
 	m.trackKAT500.Store(true)
 
@@ -83,11 +85,11 @@ func newMonitor() (*monitor, error) {
 
 	// KAT500 monitor task
 	m.qKAT500 = util.ScheduleRecurring(func() {
-		if controller == nil || controller.isReconnecting() {
+		if m.ctrl == nil || m.ctrl.isReconnecting() {
 			return
 		}
 
-		err := controller.tryPollKAT(func(cmd *command) error {
+		err := m.ctrl.tryPollKAT(func(cmd *command) error {
 			f, err := cmd.getKAT500InFault()
 			if err != nil {
 				return err
@@ -109,17 +111,17 @@ func newMonitor() (*monitor, error) {
 		if err != nil {
 			log.Printf("%+v", err)
 			status.SetStatus(status.SystemStatusKAT500, status.StatusFailed)
-			_ = controller.reconnect(m.quit)
+			_ = m.ctrl.reconnect(m.quit)
 		}
 	}, 1*time.Second)
 
 	// KPA500 monitor task
 	m.qKPA500 = util.ScheduleRecurring(func() {
-		if controller == nil || controller.isReconnecting() {
+		if m.ctrl == nil || m.ctrl.isReconnecting() {
 			return
 		}
 
-		err := controller.tryPollKPA(func(cmd *command) error {
+		err := m.ctrl.tryPollKPA(func(cmd *command) error {
 			f, err := cmd.getKPA500InFault()
 			if err != nil {
 				return err
@@ -151,12 +153,13 @@ func newMonitor() (*monitor, error) {
 		if err != nil {
 			log.Printf("%+v", err)
 			status.SetStatus(status.SystemStatusKPA500, status.StatusFailed)
-			_ = controller.reconnect(m.quit)
+			_ = m.ctrl.reconnect(m.quit)
 		}
 	}, 1*time.Second)
 
-	// kick off monitor loop
+	// Publish before the radio loop so monitorRadioPort can see m.r.
 	m.quit = make(chan bool)
+	ctrl.m = m
 	go m.monitorRadio()
 
 	ok = true
@@ -170,16 +173,19 @@ func (m *monitor) monitorRadio() {
 		case <-m.quit:
 			return
 		default:
-			if controller != nil && controller.isReconnecting() {
+			if m.ctrl == nil {
+				return
+			}
+			if m.ctrl.isReconnecting() {
 				if !sleepQuit(200*time.Millisecond, m.quit) {
 					return
 				}
 				continue
 			}
 
-			r := controller.monitorRadioPort()
+			r := m.ctrl.monitorRadioPort()
 			if r == nil {
-				if controller == nil || !controller.reconnect(m.quit) {
+				if !m.ctrl.reconnect(m.quit) {
 					return
 				}
 				continue
@@ -189,7 +195,7 @@ func (m *monitor) monitorRadio() {
 			if err != nil {
 				log.Printf("%+v", err)
 				status.SetStatus(status.SystemStatusRadio, status.StatusFailed)
-				if !controller.reconnect(m.quit) {
+				if !m.ctrl.reconnect(m.quit) {
 					return
 				}
 				continue
@@ -213,7 +219,7 @@ func (m *monitor) monitorRadio() {
 				if err != nil {
 					log.Printf("%+v", err)
 					status.SetStatus(status.SystemStatusRadio, status.StatusFailed)
-					if !controller.reconnect(m.quit) {
+					if !m.ctrl.reconnect(m.quit) {
 						return
 					}
 					continue
@@ -245,13 +251,13 @@ func (m *monitor) monitorRadio() {
 			}.Update()
 
 			if m.trackKAT500.Load() {
-				err = controller.withCommand(func(cmd *command) error {
+				err = m.ctrl.withCommand(func(cmd *command) error {
 					return cmd.updateKAT500Frequency()
 				})
 				if err != nil {
 					log.Printf("%+v", err)
 					status.SetStatus(status.SystemStatusKAT500, status.StatusFailed)
-					if !controller.reconnect(m.quit) {
+					if !m.ctrl.reconnect(m.quit) {
 						return
 					}
 					continue
@@ -261,7 +267,7 @@ func (m *monitor) monitorRadio() {
 			if b != m.band {
 				m.band = b
 
-				err = controller.withCommand(func(cmd *command) error {
+				err = m.ctrl.withCommand(func(cmd *command) error {
 					if err := cmd.updateKPA500Band(); err != nil {
 						return err
 					}
@@ -271,7 +277,7 @@ func (m *monitor) monitorRadio() {
 					log.Printf("%+v", err)
 					status.SetStatus(status.SystemStatusKPA500, status.StatusFailed)
 					status.SetStatus(status.SystemStatusRadio, status.StatusFailed)
-					if !controller.reconnect(m.quit) {
+					if !m.ctrl.reconnect(m.quit) {
 						return
 					}
 					continue
@@ -329,7 +335,7 @@ func (m *monitor) initializeDevices() error {
 		Band:      m.band,
 	}.Update()
 
-	err = controller.withCommand(func(cmd *command) error {
+	err = m.ctrl.withCommand(func(cmd *command) error {
 		if err := cmd.updateKAT500Frequency(); err != nil {
 			return err
 		}
