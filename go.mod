@@ -7,7 +7,7 @@ require (
 	github.com/lxn/win v0.0.0-20210218163916-a377121e959e
 	go.bug.st/serial v1.8.0
 	golang.org/x/sys v0.47.0
-	gopkg.in/yaml.v2 v2.4.0
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (

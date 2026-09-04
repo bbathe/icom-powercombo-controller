@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/lxn/walk"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 type mainwinposition struct {
