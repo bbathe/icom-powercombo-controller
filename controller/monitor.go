@@ -19,9 +19,10 @@ type monitor struct {
 	qKAT500 chan bool
 	qKPA500 chan bool
 
-	freq       int64
-	band       int
-	lastFreqAt time.Time
+	freq             int64
+	band             int
+	lastFreqAt       time.Time
+	lastRadioProbeAt time.Time
 
 	trackKAT500 atomic.Bool
 }
@@ -30,6 +31,9 @@ type monitor struct {
 // The CI-V port usually stays open when the radio is powered off, so silence
 // (not a serial error) is what we have to detect.
 const radioSilenceLimit = 3 * time.Second
+
+// Minimum gap between QueryFrequency liveness probes once silence is overdue.
+const radioProbeInterval = 2 * time.Second
 
 func (m *monitor) close() {
 	if m == nil {
@@ -198,7 +202,13 @@ func (m *monitor) monitorRadio() {
 				}
 
 				// Quiet too long — ask the radio before declaring it dead
-				// (many Icoms only broadcast on VFO change).
+				// (many Icoms only broadcast on VFO change). Back off probes
+				// while already failed so we do not hammer the port.
+				if !m.lastRadioProbeAt.IsZero() && time.Since(m.lastRadioProbeAt) < radioProbeInterval {
+					continue
+				}
+				m.lastRadioProbeAt = time.Now()
+
 				f, err = r.QueryFrequency()
 				if err != nil {
 					log.Printf("%+v", err)
@@ -215,6 +225,7 @@ func (m *monitor) monitorRadio() {
 			}
 
 			m.lastFreqAt = time.Now()
+			m.lastRadioProbeAt = time.Time{}
 			status.SetStatus(status.SystemStatusRadio, status.StatusOK)
 
 			if f == m.freq {
