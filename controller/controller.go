@@ -1,6 +1,10 @@
 package controller
 
-import "github.com/bbathe/icom-powercombo-controller/status"
+import (
+	"fmt"
+
+	"github.com/bbathe/icom-powercombo-controller/status"
+)
 
 type Controller struct {
 	c *command
@@ -11,23 +15,42 @@ var (
 	controller *Controller
 )
 
-func NewController() *Controller {
-	if controller == nil {
-		controller = new(Controller)
-
-		c := newCommand()
-		controller.c = c
-
-		m := newMonitor()
-		controller.m = m
+func NewController() (*Controller, error) {
+	if controller != nil {
+		return controller, nil
 	}
 
-	return controller
+	c, err := newCommand()
+	if err != nil {
+		return nil, err
+	}
+
+	// monitor init and polls use the package singleton's command side
+	ctrl := &Controller{c: c}
+	controller = ctrl
+
+	m, err := newMonitor()
+	if err != nil {
+		c.close()
+		controller = nil
+		return nil, err
+	}
+
+	ctrl.m = m
+	return ctrl, nil
 }
 
 func (c *Controller) Close() {
-	c.m.close()
-	c.c.close()
+	if c == nil {
+		return
+	}
+
+	if c.m != nil {
+		c.m.close()
+	}
+	if c.c != nil {
+		c.c.close()
+	}
 
 	status.SetStatuses(status.StatusUnknown)
 
@@ -47,4 +70,9 @@ func (c *Controller) KAT500FullTune() error {
 // SetTrackKAT500 indictes whether frequency information should be sent to the KAT500
 func (c *Controller) SetTrackKAT500(t bool) {
 	c.m.trackKAT500 = t
+}
+
+// wrapOpenError formats a device open failure for the UI
+func wrapOpenError(device, port string, err error) error {
+	return fmt.Errorf("%s open failed (%s): %w", device, port, err)
 }

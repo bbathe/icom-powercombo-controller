@@ -16,31 +16,43 @@ type command struct {
 }
 
 func (c *command) close() {
-	c.r.Close()
-	c.kpa.Close()
-	c.kat.Close()
+	if c == nil {
+		return
+	}
+	if c.r != nil {
+		c.r.Close()
+	}
+	if c.kpa != nil {
+		c.kpa.Close()
+	}
+	if c.kat != nil {
+		c.kat.Close()
+	}
 }
 
-func newCommand() *command {
+func newCommand() (*command, error) {
 	// connect to radio
 	r, err := icom.OpenRadio(config.Radio.CommandPort, config.Radio.Baud, config.Radio.Address)
 	if err != nil {
 		log.Printf("%+v", err)
-		return nil
+		return nil, wrapOpenError("radio command port", config.Radio.CommandPort, err)
 	}
 
 	// connect to kat500
 	kat, err := elecraft.OpenKAT500(config.KAT500.Port, config.KAT500.Baud)
 	if err != nil {
 		log.Printf("%+v", err)
-		return nil
+		r.Close()
+		return nil, wrapOpenError("KAT500", config.KAT500.Port, err)
 	}
 
 	// connect to kpa500
 	kpa, err := elecraft.OpenKPA500(config.KPA500.Port, config.KPA500.Baud)
 	if err != nil {
 		log.Printf("%+v", err)
-		return nil
+		kat.Close()
+		r.Close()
+		return nil, wrapOpenError("KPA500", config.KPA500.Port, err)
 	}
 
 	c := new(command)
@@ -48,7 +60,7 @@ func newCommand() *command {
 	c.kpa = kpa
 	c.kat = kat
 
-	return c
+	return c, nil
 }
 
 func (c *command) updateKPA500Mode() error {

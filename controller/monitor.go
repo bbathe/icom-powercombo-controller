@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"fmt"
 	"log"
 	"time"
 
@@ -25,20 +26,31 @@ type monitor struct {
 }
 
 func (m *monitor) close() {
-	close(m.quit)
-	close(m.qKAT500)
-	close(m.qKPA500)
-	m.r.Close()
+	if m == nil {
+		return
+	}
+	if m.quit != nil {
+		close(m.quit)
+	}
+	if m.qKAT500 != nil {
+		close(m.qKAT500)
+	}
+	if m.qKPA500 != nil {
+		close(m.qKPA500)
+	}
+	if m.r != nil {
+		m.r.Close()
+	}
 }
 
 // newMonitor spins off all the seperate processes for monitoring all devices
-func newMonitor() *monitor {
+func newMonitor() (*monitor, error) {
 	// connect to radio
 	r, err := icom.OpenRadio(config.Radio.MonitorPort, config.Radio.Baud, config.Radio.Address)
 	if err != nil {
 		log.Printf("%+v", err)
 		status.SetStatus(status.SystemStatusRadio, status.StatusFailed)
-		return nil
+		return nil, wrapOpenError("radio monitor port", config.Radio.MonitorPort, err)
 	}
 	status.SetStatus(status.SystemStatusRadio, status.StatusOK)
 
@@ -49,7 +61,8 @@ func newMonitor() *monitor {
 	err = m.initializeDevices()
 	if err != nil {
 		log.Printf("%+v", err)
-		return nil
+		r.Close()
+		return nil, fmt.Errorf("device initialization failed: %w", err)
 	}
 
 	// KAT500 monitor task
@@ -133,7 +146,7 @@ func newMonitor() *monitor {
 	m.quit = make(chan bool)
 	go m.monitorRadio()
 
-	return m
+	return m, nil
 }
 
 // monitorRadio keeps the KAT500 & KPA500 in-sync with the frequency on the radio

@@ -335,14 +335,14 @@ func MainWindow() error {
 			mutexCtrl.Lock()
 			defer mutexCtrl.Unlock()
 
-			// shutdown in standby
-			err = ctrl.SetKPA500Mode(0)
-			if err != nil {
-				MsgError(nil, err)
-				log.Printf("%+v", err)
-			}
-
 			if ctrl != nil {
+				// shutdown in standby
+				err = ctrl.SetKPA500Mode(0)
+				if err != nil {
+					MsgError(nil, err)
+					log.Printf("%+v", err)
+				}
+
 				ctrl.Close()
 			}
 		})
@@ -361,7 +361,13 @@ func MainWindow() error {
 			mutexCtrl.Lock()
 			defer mutexCtrl.Unlock()
 
-			ctrl = controller.NewController()
+			var err error
+			ctrl, err = controller.NewController()
+			if err != nil {
+				MsgError(mainWin, err)
+				log.Printf("%+v", err)
+				ctrl = nil
+			}
 		}()
 	}
 
@@ -395,7 +401,12 @@ func updateConfig(p *walk.MainWindow, configFile string) {
 	}
 
 	// start controller
-	ctrl = controller.NewController()
+	ctrl, err = controller.NewController()
+	if err != nil {
+		MsgError(p, err)
+		log.Printf("%+v", err)
+		ctrl = nil
+	}
 }
 
 // determineConfigFile returns the configuration file to use based on whether user passed one on the commandline
