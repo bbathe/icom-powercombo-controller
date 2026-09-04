@@ -19,11 +19,17 @@ type monitor struct {
 	qKAT500 chan bool
 	qKPA500 chan bool
 
-	freq int64
-	band int
+	freq       int64
+	band       int
+	lastFreqAt time.Time
 
 	trackKAT500 atomic.Bool
 }
+
+// How long without a frequency reading before the radio LED goes red.
+// The CI-V port usually stays open when the radio is powered off, so silence
+// (not a serial error) is what we have to detect.
+const radioSilenceLimit = 3 * time.Second
 
 func (m *monitor) close() {
 	if m == nil {
@@ -184,10 +190,34 @@ func (m *monitor) monitorRadio() {
 				}
 				continue
 			}
+
+			// Empty/partial reads are normal between broadcasts.
+			if f < 0 {
+				if m.lastFreqAt.IsZero() || time.Since(m.lastFreqAt) <= radioSilenceLimit {
+					continue
+				}
+
+				// Quiet too long — ask the radio before declaring it dead
+				// (many Icoms only broadcast on VFO change).
+				f, err = r.QueryFrequency()
+				if err != nil {
+					log.Printf("%+v", err)
+					status.SetStatus(status.SystemStatusRadio, status.StatusFailed)
+					if !controller.reconnect(m.quit) {
+						return
+					}
+					continue
+				}
+				if f < 0 {
+					status.SetStatus(status.SystemStatusRadio, status.StatusFailed)
+					continue
+				}
+			}
+
+			m.lastFreqAt = time.Now()
 			status.SetStatus(status.SystemStatusRadio, status.StatusOK)
 
-			// no update or no frequency change?
-			if f < 0 || f == m.freq {
+			if f == m.freq {
 				continue
 			}
 
@@ -281,6 +311,7 @@ func (m *monitor) initializeDevices() error {
 
 	m.freq = f
 	m.band = b
+	m.lastFreqAt = time.Now()
 
 	data.Radio{
 		Frequency: m.freq,

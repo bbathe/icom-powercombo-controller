@@ -128,6 +128,39 @@ func (r *Radio) writeCIVMessageToPort(msg string) error {
 	return nil
 }
 
+// QueryFrequency sends CI-V command 03 and waits up to responseWait for a frequency reply.
+// Returns -1, nil when the radio does not answer (powered off / unplugged CI-V).
+func (r *Radio) QueryFrequency() (int64, error) {
+	r.mutexPort.Lock()
+	defer r.mutexPort.Unlock()
+
+	err := r.writeCIVMessageToPort(fmt.Sprintf("FEFE%sE003FD", r.Address))
+	if err != nil {
+		if err == errPortClosed {
+			return -1, nil
+		}
+		log.Printf("%+v", err)
+		return 0, err
+	}
+	r.f = true
+
+	deadline := time.Now().Add(responseWait)
+	for time.Now().Before(deadline) {
+		msg, err := r.readCIVMessageFromPort()
+		if err != nil {
+			if err == errPortClosed {
+				return -1, nil
+			}
+			log.Printf("%+v", err)
+			return 0, err
+		}
+		if freq, ok := parseOperatingFrequency(msg); ok {
+			return freq, nil
+		}
+	}
+	return -1, nil
+}
+
 // GetFrequency returns the current radio frequency
 // it does this by polling for the "Transfer operating frequency data" broadcast message
 // if port is closed during reading, -1 is returned
@@ -159,21 +192,27 @@ func (r *Radio) GetFrequency() (int64, error) {
 		return 0, err
 	}
 
-	// is it operating frequency data?
-	if len(msg) == 11 && (msg[2] == 0xE0 || msg[2] == 0x00) {
-		// radio sends as least significant byte first, flip order of bytes
-		fd := fmt.Sprintf("%02X%02X%02X%02X%02X", msg[9], msg[8], msg[7], msg[6], msg[5])
-
-		// convert to number
-		freq, err := strconv.ParseInt(fd, 10, 64)
-		if err != nil {
-			return -1, nil
-		}
-
+	if freq, ok := parseOperatingFrequency(msg); ok {
 		return freq, nil
 	}
 
 	return -1, nil
+}
+
+func parseOperatingFrequency(msg []byte) (int64, bool) {
+	// is it operating frequency data?
+	if len(msg) != 11 || (msg[2] != 0xE0 && msg[2] != 0x00) {
+		return 0, false
+	}
+
+	// radio sends as least significant byte first, flip order of bytes
+	fd := fmt.Sprintf("%02X%02X%02X%02X%02X", msg[9], msg[8], msg[7], msg[6], msg[5])
+
+	freq, err := strconv.ParseInt(fd, 10, 64)
+	if err != nil {
+		return 0, false
+	}
+	return freq, true
 }
 
 // SetRFPower sets the RF Power of the radio
