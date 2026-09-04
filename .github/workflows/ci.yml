@@ -1,5 +1,9 @@
 name: Tests
-on: [push]
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
 jobs:
 
   codetest_build:
@@ -7,17 +11,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
 
-      - name: Set up Go 1.16
-        uses: actions/setup-go@v1
-        with:
-          go-version: 1.16
-        id: go
+      - name: Install mingw-w64
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mingw-w64
 
-      - name: Check out code into the Go module directory
-        uses: actions/checkout@v1
+      - name: Set up Go 1.26
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+
+      - name: Check out code
+        uses: actions/checkout@v4
 
       - name: Get dependencies
         run: make get
 
       - name: Codetest
         run: make codetest
+
+      - name: Build
+        run: make build

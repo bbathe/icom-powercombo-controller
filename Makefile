@@ -5,9 +5,9 @@ package := $(shell basename `pwd`)
 default: fmt codetest
 
 get:
-	GOOS=windows GOARCH=amd64 go get -v ./...
-	go get github.com/akavel/rsrc
-	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell go env GOPATH)/bin v1.31.0
+	GOOS=windows GOARCH=amd64 go mod download
+	go install github.com/akavel/rsrc@latest
+	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.9.0
 
 codetest: lint vet
 
@@ -21,7 +21,7 @@ fmt:
 	GOOS=windows GOARCH=amd64 go fmt ./...
 
 lint:
-	GOOS=windows GOARCH=amd64 $(shell go env GOPATH)/bin/golangci-lint run --fix
+	GOOS=windows GOARCH=amd64 $(shell go env GOPATH)/bin/golangci-lint run --timeout 5m
 
 vet:
 	GOOS=windows GOARCH=amd64 go vet -all ./...

@@ -1,7 +1,6 @@
 package config
 
 import (
-	"io/ioutil"
 	"log"
 	"os"
 
@@ -72,7 +71,7 @@ var (
 // Read loads application configuration from file fname
 func Read(fname string) error {
 	// read yaml from fname
-	bytes, err := ioutil.ReadFile(fname)
+	bytes, err := os.ReadFile(fname)
 	if err != nil {
 		log.Printf("%+v", err)
 		return err
@@ -154,7 +153,7 @@ func Write(fname string) error {
 	}
 
 	// write out to fname
-	err = ioutil.WriteFile(fname, b, 0600)
+	err = os.WriteFile(fname, b, 0600)
 	if err != nil {
 		log.Printf("%+v", err)
 		return err
