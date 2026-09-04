@@ -29,6 +29,11 @@ var (
 	errPortClosed = fmt.Errorf("port closed")
 )
 
+const (
+	readTimeout  = 333 * time.Millisecond
+	responseWait = 3 * time.Second
+)
+
 // OpenRadio creates a connection with the radio
 func OpenRadio(port string, baud int, address string) (*Radio, error) {
 	p, err := openSerialPort(port, baud)
@@ -51,7 +56,7 @@ func openSerialPort(name string, baud int) (serial.Port, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := p.SetReadTimeout(333 * time.Millisecond); err != nil {
+	if err := p.SetReadTimeout(readTimeout); err != nil {
 		_ = p.Close()
 		return nil, err
 	}
@@ -193,8 +198,8 @@ func (r *Radio) SetRFPower(power int) error {
 		return err
 	}
 
-	// read response from radio
-	for {
+	deadline := time.Now().Add(responseWait)
+	for time.Now().Before(deadline) {
 		msg, err := r.readCIVMessageFromPort()
 		if err != nil {
 			if err == errPortClosed {
@@ -212,9 +217,11 @@ func (r *Radio) SetRFPower(power int) error {
 				log.Printf("%+v", err)
 				return err
 			}
-			break
+			return nil
 		}
 	}
 
-	return nil
+	err = fmt.Errorf("serial response timeout")
+	log.Printf("%+v", err)
+	return err
 }

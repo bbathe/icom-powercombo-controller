@@ -103,7 +103,6 @@ func (k *KPA500) GetPower() (int, error) {
 	k.mutexPort.Lock()
 	defer k.mutexPort.Unlock()
 
-	// request power
 	err := writeMessageToPort(k.p, "^WS;")
 	if k.closed.IsTrue() {
 		return 0, nil
@@ -113,45 +112,33 @@ func (k *KPA500) GetPower() (int, error) {
 		return 0, err
 	}
 
-	// read response from kpa500
-	for {
-		msg, err := readMessageFromPort(k.p)
-		if k.closed.IsTrue() {
-			return 0, nil
-		}
-		if err != nil {
-			log.Printf("%+v", err)
-			return 0, err
-		}
-		if msg == "" {
-			// no response, kpa500 disconnected?
-			return 0, nil
-		}
-
-		// our response?
-		if strings.HasPrefix(msg, "^WS") {
-			// RSP format: ^WSppp sss;
-			s := strings.TrimPrefix(msg, "^WS")
-			s = strings.TrimSuffix(s, ";")
-
-			if len(s) == 0 {
-				// no response, kpa500 disconnected?
-				return 0, nil
-			}
-
-			ss := strings.Split(s, " ")
-			w := ss[0]
-
-			// convert to number
-			watts, err := strconv.Atoi(w)
-			if err != nil {
-				log.Printf("%+v", err)
-				return 0, err
-			}
-
-			return watts, nil
-		}
+	msg, err := readMatchingMessage(k.p, func(msg string) bool {
+		return strings.HasPrefix(msg, "^WS")
+	}, k.closed.IsTrue)
+	if err != nil {
+		log.Printf("%+v", err)
+		return 0, err
 	}
+	if msg == "" {
+		return 0, nil
+	}
+
+	s := strings.TrimPrefix(msg, "^WS")
+	s = strings.TrimSuffix(s, ";")
+	if len(s) == 0 {
+		return 0, fmt.Errorf("no serial response")
+	}
+
+	ss := strings.Split(s, " ")
+	w := ss[0]
+
+	watts, err := strconv.Atoi(w)
+	if err != nil {
+		log.Printf("%+v", err)
+		return 0, err
+	}
+
+	return watts, nil
 }
 
 // GetFault gets the current fault identifier from the KPA500, zero indicates no faults are active
@@ -159,7 +146,6 @@ func (k *KPA500) GetFault() (int, error) {
 	k.mutexPort.Lock()
 	defer k.mutexPort.Unlock()
 
-	// request current fault
 	err := writeMessageToPort(k.p, "^FL;")
 	if k.closed.IsTrue() {
 		return 0, nil
@@ -169,42 +155,30 @@ func (k *KPA500) GetFault() (int, error) {
 		return 0, err
 	}
 
-	// read response from kpa500
-	for {
-		msg, err := readMessageFromPort(k.p)
-		if k.closed.IsTrue() {
-			return 0, nil
-		}
-		if err != nil {
-			log.Printf("%+v", err)
-			return 0, err
-		}
-		if msg == "" {
-			// no response, kpa500 disconnected?
-			return 255, nil
-		}
-
-		// our response?
-		if strings.HasPrefix(msg, "^FL") {
-			// RSP format: ^FLnn;
-			s := strings.TrimPrefix(msg, "^FL")
-			s = strings.TrimSuffix(s, ";")
-
-			if len(s) == 0 {
-				// no response, kpa500 disconnected?
-				return 255, nil
-			}
-
-			// convert to number
-			fault, err := strconv.Atoi(s)
-			if err != nil {
-				log.Printf("%+v", err)
-				return 0, err
-			}
-
-			return fault, nil
-		}
+	msg, err := readMatchingMessage(k.p, func(msg string) bool {
+		return strings.HasPrefix(msg, "^FL")
+	}, k.closed.IsTrue)
+	if err != nil {
+		log.Printf("%+v", err)
+		return 0, err
 	}
+	if msg == "" {
+		return 0, nil
+	}
+
+	s := strings.TrimPrefix(msg, "^FL")
+	s = strings.TrimSuffix(s, ";")
+	if len(s) == 0 {
+		return 0, fmt.Errorf("no serial response")
+	}
+
+	fault, err := strconv.Atoi(s)
+	if err != nil {
+		log.Printf("%+v", err)
+		return 0, err
+	}
+
+	return fault, nil
 }
 
 // GetPAVoltsCurrent gets the PA Voltage and Current from the KPA500
@@ -212,59 +186,49 @@ func (k *KPA500) GetPAVoltsCurrent() (float64, float64, error) {
 	k.mutexPort.Lock()
 	defer k.mutexPort.Unlock()
 
-	// request pa volts & current
 	err := writeMessageToPort(k.p, "^VI;")
 	if k.closed.IsTrue() {
 		return 0.0, 0.0, nil
 	}
 	if err != nil {
 		log.Printf("%+v", err)
+		return 0.0, 0.0, err
+	}
+
+	msg, err := readMatchingMessage(k.p, func(msg string) bool {
+		return strings.HasPrefix(msg, "^VI")
+	}, k.closed.IsTrue)
+	if err != nil {
+		log.Printf("%+v", err)
+		return 0.0, 0.0, err
+	}
+	if msg == "" {
 		return 0.0, 0.0, nil
 	}
 
-	// read response from kpa500
-	for {
-		msg, err := readMessageFromPort(k.p)
-		if k.closed.IsTrue() {
-			return 0.0, 0.0, nil
-		}
-		if err != nil {
-			log.Printf("%+v", err)
-			return 0.0, 0.0, nil
-		}
-		if msg == "" {
-			// no response, kpa500 disconnected?
-			return 0.0, 0.0, nil
-		}
-
-		// our response?
-		if strings.HasPrefix(msg, "^VI") {
-			// RSP format:  ^VIvvv iii; where vvv = the PA voltage with range 00.0 - 99.9 volts, and iii = PA current with range of 00.0 - 99.9 amps
-			s := strings.TrimPrefix(msg, "^VI")
-			s = strings.TrimSuffix(s, ";")
-
-			if len(s) == 0 {
-				// no response, kpa500 disconnected?
-				return 0.0, 0.0, nil
-			}
-
-			ss := strings.Split(s, " ")
-			v := ss[0][:2] + "." + ss[0][2:]
-			a := ss[1][:2] + "." + ss[1][2:]
-
-			// convert to floats
-			volts, err := strconv.ParseFloat(v, 64)
-			if err != nil {
-				log.Printf("%+v", err)
-				return 0.0, 0.0, nil
-			}
-			amps, err := strconv.ParseFloat(a, 64)
-			if err != nil {
-				log.Printf("%+v", err)
-				return 0.0, 0.0, nil
-			}
-
-			return volts, amps, nil
-		}
+	s := strings.TrimPrefix(msg, "^VI")
+	s = strings.TrimSuffix(s, ";")
+	if len(s) == 0 {
+		return 0.0, 0.0, fmt.Errorf("no serial response")
 	}
+
+	ss := strings.Split(s, " ")
+	if len(ss) < 2 || len(ss[0]) < 3 || len(ss[1]) < 3 {
+		return 0.0, 0.0, fmt.Errorf("invalid VI response %q", msg)
+	}
+	v := ss[0][:2] + "." + ss[0][2:]
+	a := ss[1][:2] + "." + ss[1][2:]
+
+	volts, err := strconv.ParseFloat(v, 64)
+	if err != nil {
+		log.Printf("%+v", err)
+		return 0.0, 0.0, err
+	}
+	amps, err := strconv.ParseFloat(a, 64)
+	if err != nil {
+		log.Printf("%+v", err)
+		return 0.0, 0.0, err
+	}
+
+	return volts, amps, nil
 }

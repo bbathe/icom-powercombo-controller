@@ -2,12 +2,16 @@ package elecraft
 
 import (
 	"bytes"
+	"fmt"
 	"time"
 
 	"go.bug.st/serial"
 )
 
-const readTimeout = 333 * time.Millisecond
+const (
+	readTimeout  = 333 * time.Millisecond
+	responseWait = 3 * time.Second
+)
 
 func openSerialPort(name string, baud int) (serial.Port, error) {
 	p, err := serial.Open(name, &serial.Mode{BaudRate: baud})
@@ -47,6 +51,31 @@ func readMessageFromPort(p serial.Port) (string, error) {
 
 	// return message
 	return buf.String(), nil
+}
+
+// readMatchingMessage reads framed messages until match returns true or responseWait elapses.
+// An empty read (read timeout with no data) is treated as no response / disconnect.
+func readMatchingMessage(p serial.Port, match func(string) bool, closed func() bool) (string, error) {
+	deadline := time.Now().Add(responseWait)
+
+	for time.Now().Before(deadline) {
+		if closed != nil && closed() {
+			return "", nil
+		}
+
+		msg, err := readMessageFromPort(p)
+		if err != nil {
+			return "", err
+		}
+		if msg == "" {
+			return "", fmt.Errorf("no serial response")
+		}
+		if match(msg) {
+			return msg, nil
+		}
+	}
+
+	return "", fmt.Errorf("serial response timeout")
 }
 
 // writeMessageToPort writes a KPA500/KAT500 formatted message to port p
