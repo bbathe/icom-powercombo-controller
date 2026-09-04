@@ -3,6 +3,7 @@ package controller
 import (
 	"fmt"
 	"log"
+	"sync/atomic"
 	"time"
 
 	"github.com/bbathe/icom-powercombo-controller/data"
@@ -21,7 +22,7 @@ type monitor struct {
 	freq int64
 	band int
 
-	trackKAT500 bool
+	trackKAT500 atomic.Bool
 }
 
 func (m *monitor) close() {
@@ -62,7 +63,7 @@ func newMonitor() (*monitor, error) {
 
 	m := new(monitor)
 	m.r = r
-	m.trackKAT500 = true
+	m.trackKAT500.Store(true)
 
 	err = m.initializeDevices()
 	if err != nil {
@@ -202,7 +203,7 @@ func (m *monitor) monitorRadio() {
 				Band:      b,
 			}.Update()
 
-			if m.trackKAT500 {
+			if m.trackKAT500.Load() {
 				err = controller.withCommand(func(cmd *command) error {
 					return cmd.updateKAT500Frequency()
 				})

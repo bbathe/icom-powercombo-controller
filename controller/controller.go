@@ -101,7 +101,7 @@ func (c *Controller) SetTrackKAT500(t bool) {
 	if c == nil || c.m == nil {
 		return
 	}
-	c.m.trackKAT500 = t
+	c.m.trackKAT500.Store(t)
 }
 
 // wrapOpenError formats a device open failure for the UI
