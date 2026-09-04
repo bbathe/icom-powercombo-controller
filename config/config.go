@@ -4,7 +4,6 @@ import (
 	"log"
 	"os"
 
-	"github.com/lxn/walk"
 	"gopkg.in/yaml.v3"
 )
 
@@ -13,9 +12,9 @@ type mainwinposition struct {
 	Y int `yaml:"toplefty"`
 }
 
-func (mwp *mainwinposition) FromBounds(bounds walk.Rectangle) {
-	mwp.X = bounds.X
-	mwp.Y = bounds.Y
+func (mwp *mainwinposition) FromBounds(x, y int) {
+	mwp.X = x
+	mwp.Y = y
 }
 
 type ui struct {

@@ -326,7 +326,7 @@ func MainWindow() error {
 			status.Detach(hStatusChangeEventHandler)
 
 			// save windows position in config
-			config.UI.MainWinPosition.FromBounds(mainWin.Bounds())
+			config.UI.MainWinPosition.FromBounds(mainWin.Bounds().X, mainWin.Bounds().Y)
 			err = config.Write(configFile)
 			if err != nil {
 				MsgError(nil, err)

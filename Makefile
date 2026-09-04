@@ -11,8 +11,10 @@ get:
 
 codetest: lint vet test
 
+# Native host tests (not GOOS=windows): Windows test binaries cannot run on Linux CI.
+# Skip ui/cmd — they require Walk/Win32.
 test:
-	GOOS=windows GOARCH=amd64 go test ./...
+	go test ./config ./controller ./data ./device/... ./status ./util
 
 build:
 	mkdir -p target
