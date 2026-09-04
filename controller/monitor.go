@@ -45,13 +45,20 @@ func (m *monitor) close() {
 
 // newMonitor spins off all the seperate processes for monitoring all devices
 func newMonitor() (*monitor, error) {
-	// connect to radio
 	r, err := icom.OpenRadio(config.Radio.MonitorPort, config.Radio.Baud, config.Radio.Address)
 	if err != nil {
 		log.Printf("%+v", err)
 		status.SetStatus(status.SystemStatusRadio, status.StatusFailed)
 		return nil, wrapOpenError("radio monitor port", config.Radio.MonitorPort, err)
 	}
+
+	ok := false
+	defer func() {
+		if !ok {
+			_ = r.Close()
+		}
+	}()
+
 	status.SetStatus(status.SystemStatusRadio, status.StatusOK)
 
 	m := new(monitor)
@@ -61,7 +68,6 @@ func newMonitor() (*monitor, error) {
 	err = m.initializeDevices()
 	if err != nil {
 		log.Printf("%+v", err)
-		r.Close()
 		return nil, fmt.Errorf("device initialization failed: %w", err)
 	}
 
@@ -146,6 +152,7 @@ func newMonitor() (*monitor, error) {
 	m.quit = make(chan bool)
 	go m.monitorRadio()
 
+	ok = true
 	return m, nil
 }
 

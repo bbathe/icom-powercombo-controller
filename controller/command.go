@@ -31,36 +31,40 @@ func (c *command) close() {
 }
 
 func newCommand() (*command, error) {
-	// connect to radio
+	var closers []func()
+	ok := false
+	defer func() {
+		if ok {
+			return
+		}
+		for i := len(closers) - 1; i >= 0; i-- {
+			closers[i]()
+		}
+	}()
+
 	r, err := icom.OpenRadio(config.Radio.CommandPort, config.Radio.Baud, config.Radio.Address)
 	if err != nil {
 		log.Printf("%+v", err)
 		return nil, wrapOpenError("radio command port", config.Radio.CommandPort, err)
 	}
+	closers = append(closers, func() { _ = r.Close() })
 
-	// connect to kat500
 	kat, err := elecraft.OpenKAT500(config.KAT500.Port, config.KAT500.Baud)
 	if err != nil {
 		log.Printf("%+v", err)
-		r.Close()
 		return nil, wrapOpenError("KAT500", config.KAT500.Port, err)
 	}
+	closers = append(closers, func() { _ = kat.Close() })
 
-	// connect to kpa500
 	kpa, err := elecraft.OpenKPA500(config.KPA500.Port, config.KPA500.Baud)
 	if err != nil {
 		log.Printf("%+v", err)
-		kat.Close()
-		r.Close()
 		return nil, wrapOpenError("KPA500", config.KPA500.Port, err)
 	}
+	closers = append(closers, func() { _ = kpa.Close() })
 
-	c := new(command)
-	c.r = r
-	c.kpa = kpa
-	c.kat = kat
-
-	return c, nil
+	ok = true
+	return &command{r: r, kpa: kpa, kat: kat}, nil
 }
 
 func (c *command) updateKPA500Mode() error {
