@@ -182,11 +182,7 @@ func (r *Radio) SetRFPower(power int) error {
 	defer r.mutexPort.Unlock()
 
 	// calculate radio power setting from percentage
-	t := power * 255
-	p := t / 100
-	if t%100 > 0 {
-		p += 1
-	}
+	p := RFPowerToCIV(power)
 
 	// set rf power
 	err := r.writeCIVMessageToPort(fmt.Sprintf("FEFE%sE0140A%04dFD", r.Address, p))

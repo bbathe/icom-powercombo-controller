@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"strconv"
 	"strings"
 	"sync"
 
@@ -124,16 +123,7 @@ func (k *KPA500) GetPower() (int, error) {
 		return 0, err
 	}
 
-	s := strings.TrimPrefix(msg, "^WS")
-	s = strings.TrimSuffix(s, ";")
-	if len(s) == 0 {
-		return 0, fmt.Errorf("no serial response")
-	}
-
-	ss := strings.Split(s, " ")
-	w := ss[0]
-
-	watts, err := strconv.Atoi(w)
+	watts, err := parseWS(msg)
 	if err != nil {
 		log.Printf("%+v", err)
 		return 0, err
@@ -167,13 +157,7 @@ func (k *KPA500) GetFault() (int, error) {
 		return 0, err
 	}
 
-	s := strings.TrimPrefix(msg, "^FL")
-	s = strings.TrimSuffix(s, ";")
-	if len(s) == 0 {
-		return 0, fmt.Errorf("no serial response")
-	}
-
-	fault, err := strconv.Atoi(s)
+	fault, err := parseFL(msg)
 	if err != nil {
 		log.Printf("%+v", err)
 		return 0, err
@@ -207,25 +191,7 @@ func (k *KPA500) GetPAVoltsCurrent() (float64, float64, error) {
 		return 0.0, 0.0, err
 	}
 
-	s := strings.TrimPrefix(msg, "^VI")
-	s = strings.TrimSuffix(s, ";")
-	if len(s) == 0 {
-		return 0.0, 0.0, fmt.Errorf("no serial response")
-	}
-
-	ss := strings.Split(s, " ")
-	if len(ss) < 2 || len(ss[0]) < 3 || len(ss[1]) < 3 {
-		return 0.0, 0.0, fmt.Errorf("invalid VI response %q", msg)
-	}
-	v := ss[0][:2] + "." + ss[0][2:]
-	a := ss[1][:2] + "." + ss[1][2:]
-
-	volts, err := strconv.ParseFloat(v, 64)
-	if err != nil {
-		log.Printf("%+v", err)
-		return 0.0, 0.0, err
-	}
-	amps, err := strconv.ParseFloat(a, 64)
+	volts, amps, err := parseVI(msg)
 	if err != nil {
 		log.Printf("%+v", err)
 		return 0.0, 0.0, err

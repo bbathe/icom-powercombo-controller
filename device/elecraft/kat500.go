@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"strconv"
 	"strings"
 	"sync"
 
@@ -90,13 +89,7 @@ func (k *KAT500) GetFault() (int, error) {
 		return 0, err
 	}
 
-	s := strings.TrimPrefix(msg, "FLT")
-	s = strings.TrimSuffix(s, ";")
-	if len(s) == 0 {
-		return 0, fmt.Errorf("no serial response")
-	}
-
-	fault, err := strconv.Atoi(s)
+	fault, err := parseFLT(msg)
 	if err != nil {
 		log.Printf("%+v", err)
 		return 0, err
@@ -130,13 +123,7 @@ func (k *KAT500) GetVSWR() (float64, error) {
 		return 0, err
 	}
 
-	s := strings.TrimPrefix(msg, "VSWR ")
-	s = strings.TrimSuffix(s, ";")
-	if len(s) == 0 {
-		return 0, fmt.Errorf("no serial response")
-	}
-
-	vswr, err := strconv.ParseFloat(s, 64)
+	vswr, err := parseVSWR(msg)
 	if err != nil {
 		log.Printf("%+v", err)
 		return 0, err

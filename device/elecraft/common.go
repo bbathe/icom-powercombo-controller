@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"time"
 
 	"go.bug.st/serial"
@@ -29,7 +30,7 @@ func openSerialPort(name string, baud int) (serial.Port, error) {
 }
 
 // readMessageFromPort reads a KPA500/KAT500 formatted message from port p
-func readMessageFromPort(p serial.Port) (string, error) {
+func readMessageFromPort(p io.Reader) (string, error) {
 	var buf bytes.Buffer
 	b := []byte{0}
 

@@ -1,6 +1,6 @@
 package := $(shell basename `pwd`)
 
-.PHONY: default get codetest build fmt lint vet
+.PHONY: default get codetest build fmt lint vet test
 
 default: fmt codetest
 
@@ -9,7 +9,10 @@ get:
 	go install github.com/akavel/rsrc@latest
 	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.9.0
 
-codetest: lint vet
+codetest: lint vet test
+
+test:
+	GOOS=windows GOARCH=amd64 go test ./...
 
 build:
 	mkdir -p target
