@@ -16,14 +16,14 @@ type monitor struct {
 	ctrl *Controller
 	r    *icom.Radio
 
-	quit    chan bool
-	qKAT500 chan bool
-	qKPA500 chan bool
+	quit chan bool
 
 	freq             int64
 	band             int
 	lastFreqAt       time.Time
 	lastRadioProbeAt time.Time
+	lastKATPollAt    time.Time
+	lastKPAPollAt    time.Time
 
 	trackKAT500 atomic.Bool
 }
@@ -36,18 +36,14 @@ const radioSilenceLimit = 3 * time.Second
 // Minimum gap between QueryFrequency liveness probes once silence is overdue.
 const radioProbeInterval = 2 * time.Second
 
+const elecraftPollInterval = 1 * time.Second
+
 func (m *monitor) close() {
 	if m == nil {
 		return
 	}
 	if m.quit != nil {
 		close(m.quit)
-	}
-	if m.qKAT500 != nil {
-		close(m.qKAT500)
-	}
-	if m.qKPA500 != nil {
-		close(m.qKPA500)
 	}
 	if m.r != nil {
 		m.r.Close()
@@ -76,6 +72,9 @@ func newMonitor(ctrl *Controller) (*monitor, error) {
 	m.ctrl = ctrl
 	m.r = r
 	m.trackKAT500.Store(true)
+	now := time.Now()
+	m.lastKATPollAt = now
+	m.lastKPAPollAt = now
 
 	err = m.initializeDevices()
 	if err != nil {
@@ -83,208 +82,209 @@ func newMonitor(ctrl *Controller) (*monitor, error) {
 		return nil, fmt.Errorf("device initialization failed: %w", err)
 	}
 
-	// KAT500 monitor task
-	m.qKAT500 = util.ScheduleRecurring(func() {
-		if m.ctrl == nil || m.ctrl.isReconnecting() {
-			return
-		}
-
-		err := m.ctrl.tryPollKAT(func(cmd *command) error {
-			f, err := cmd.getKAT500InFault()
-			if err != nil {
-				return err
-			}
-			if f {
-				status.SetStatus(status.SystemStatusKAT500, status.StatusFailed)
-				return nil
-			}
-
-			v, err := cmd.getKAT500VSWR()
-			if err != nil {
-				return err
-			}
-
-			data.KAT500{VSWR: v}.Update()
-			status.SetStatus(status.SystemStatusKAT500, status.StatusOK)
-			return nil
-		})
-		if err != nil {
-			log.Printf("%+v", err)
-			status.SetStatus(status.SystemStatusKAT500, status.StatusFailed)
-			_ = m.ctrl.reconnect(m.quit)
-		}
-	}, 1*time.Second)
-
-	// KPA500 monitor task
-	m.qKPA500 = util.ScheduleRecurring(func() {
-		if m.ctrl == nil || m.ctrl.isReconnecting() {
-			return
-		}
-
-		err := m.ctrl.tryPollKPA(func(cmd *command) error {
-			f, err := cmd.getKPA500InFault()
-			if err != nil {
-				return err
-			}
-			if f {
-				status.SetStatus(status.SystemStatusKPA500, status.StatusFailed)
-				return nil
-			}
-
-			p, err := cmd.getKPA500Power()
-			if err != nil {
-				return err
-			}
-
-			v, a, err := cmd.getKPA500PAVoltsCurrent()
-			if err != nil {
-				return err
-			}
-
-			data.KPA500{
-				Mode:    -1,
-				Power:   p,
-				PAVolts: v,
-				PAAmps:  a,
-			}.Update()
-			status.SetStatus(status.SystemStatusKPA500, status.StatusOK)
-			return nil
-		})
-		if err != nil {
-			log.Printf("%+v", err)
-			status.SetStatus(status.SystemStatusKPA500, status.StatusFailed)
-			_ = m.ctrl.reconnect(m.quit)
-		}
-	}, 1*time.Second)
-
-	// Publish before the radio loop so monitorRadioPort can see m.r.
+	// Publish before the loop so monitorRadioPort can see m.r.
 	m.quit = make(chan bool)
 	ctrl.m = m
-	go m.monitorRadio()
+	go m.run()
 
 	ok = true
 	return m, nil
 }
 
-// monitorRadio keeps the KAT500 & KPA500 in-sync with the frequency on the radio
-func (m *monitor) monitorRadio() {
+// run is the single monitor loop: CI-V listen/liveness plus due Elecraft polls.
+func (m *monitor) run() {
 	for {
 		select {
 		case <-m.quit:
 			return
 		default:
-			if m.ctrl == nil {
+		}
+
+		if m.ctrl == nil {
+			return
+		}
+		if m.ctrl.isReconnecting() {
+			if !sleepQuit(200*time.Millisecond, m.quit) {
 				return
 			}
-			if m.ctrl.isReconnecting() {
-				if !sleepQuit(200*time.Millisecond, m.quit) {
-					return
-				}
-				continue
+			continue
+		}
+
+		if !m.stepRadio() {
+			return
+		}
+
+		now := time.Now()
+		if now.Sub(m.lastKATPollAt) >= elecraftPollInterval {
+			m.lastKATPollAt = now
+			if !m.pollKAT() {
+				return
 			}
-
-			r := m.ctrl.monitorRadioPort()
-			if r == nil {
-				if !m.ctrl.reconnect(m.quit) {
-					return
-				}
-				continue
-			}
-
-			f, err := r.GetFrequency()
-			if err != nil {
-				log.Printf("%+v", err)
-				status.SetStatus(status.SystemStatusRadio, status.StatusFailed)
-				if !m.ctrl.reconnect(m.quit) {
-					return
-				}
-				continue
-			}
-
-			// Empty/partial reads are normal between broadcasts.
-			if f < 0 {
-				if m.lastFreqAt.IsZero() || time.Since(m.lastFreqAt) <= radioSilenceLimit {
-					continue
-				}
-
-				// Quiet too long — ask the radio before declaring it dead
-				// (many Icoms only broadcast on VFO change). Back off probes
-				// while already failed so we do not hammer the port.
-				if !m.lastRadioProbeAt.IsZero() && time.Since(m.lastRadioProbeAt) < radioProbeInterval {
-					continue
-				}
-				m.lastRadioProbeAt = time.Now()
-
-				f, err = r.QueryFrequency()
-				if err != nil {
-					log.Printf("%+v", err)
-					status.SetStatus(status.SystemStatusRadio, status.StatusFailed)
-					if !m.ctrl.reconnect(m.quit) {
-						return
-					}
-					continue
-				}
-				if f < 0 {
-					status.SetStatus(status.SystemStatusRadio, status.StatusFailed)
-					continue
-				}
-			}
-
-			m.lastFreqAt = time.Now()
-			m.lastRadioProbeAt = time.Time{}
-			status.SetStatus(status.SystemStatusRadio, status.StatusOK)
-
-			if f == m.freq {
-				continue
-			}
-
-			m.freq = f
-
-			b, err := util.BandFromFrequency(f)
-			if err != nil {
-				continue
-			}
-
-			data.Radio{
-				Frequency: f,
-				Band:      b,
-			}.Update()
-
-			if m.trackKAT500.Load() {
-				err = m.ctrl.withCommand(func(cmd *command) error {
-					return cmd.updateKAT500Frequency()
-				})
-				if err != nil {
-					log.Printf("%+v", err)
-					status.SetStatus(status.SystemStatusKAT500, status.StatusFailed)
-					if !m.ctrl.reconnect(m.quit) {
-						return
-					}
-					continue
-				}
-			}
-
-			if b != m.band {
-				m.band = b
-
-				err = m.ctrl.withCommand(func(cmd *command) error {
-					if err := cmd.updateKPA500Band(); err != nil {
-						return err
-					}
-					return cmd.updateRadioRFPower()
-				})
-				if err != nil {
-					log.Printf("%+v", err)
-					status.SetStatus(status.SystemStatusKPA500, status.StatusFailed)
-					status.SetStatus(status.SystemStatusRadio, status.StatusFailed)
-					if !m.ctrl.reconnect(m.quit) {
-						return
-					}
-					continue
-				}
+		}
+		if now.Sub(m.lastKPAPollAt) >= elecraftPollInterval {
+			m.lastKPAPollAt = now
+			if !m.pollKPA() {
+				return
 			}
 		}
 	}
+}
+
+// stepRadio performs one CI-V read/sync iteration. Returns false if the monitor should exit.
+func (m *monitor) stepRadio() bool {
+	r := m.ctrl.monitorRadioPort()
+	if r == nil {
+		return m.ctrl.reconnect(m.quit)
+	}
+
+	f, err := r.GetFrequency()
+	if err != nil {
+		log.Printf("%+v", err)
+		status.SetStatus(status.SystemStatusRadio, status.StatusFailed)
+		return m.ctrl.reconnect(m.quit)
+	}
+
+	// Empty/partial reads are normal between broadcasts.
+	if f < 0 {
+		if m.lastFreqAt.IsZero() || time.Since(m.lastFreqAt) <= radioSilenceLimit {
+			return true
+		}
+
+		// Quiet too long — ask the radio before declaring it dead
+		// (many Icoms only broadcast on VFO change). Back off probes
+		// while already failed so we do not hammer the port.
+		if !m.lastRadioProbeAt.IsZero() && time.Since(m.lastRadioProbeAt) < radioProbeInterval {
+			return true
+		}
+		m.lastRadioProbeAt = time.Now()
+
+		f, err = r.QueryFrequency()
+		if err != nil {
+			log.Printf("%+v", err)
+			status.SetStatus(status.SystemStatusRadio, status.StatusFailed)
+			return m.ctrl.reconnect(m.quit)
+		}
+		if f < 0 {
+			status.SetStatus(status.SystemStatusRadio, status.StatusFailed)
+			return true
+		}
+	}
+
+	m.lastFreqAt = time.Now()
+	m.lastRadioProbeAt = time.Time{}
+	status.SetStatus(status.SystemStatusRadio, status.StatusOK)
+
+	if f == m.freq {
+		return true
+	}
+
+	m.freq = f
+
+	b, err := util.BandFromFrequency(f)
+	if err != nil {
+		return true
+	}
+
+	data.Radio{
+		Frequency: f,
+		Band:      b,
+	}.Update()
+
+	if m.trackKAT500.Load() {
+		err = m.ctrl.withCommand(func(cmd *command) error {
+			return cmd.updateKAT500Frequency()
+		})
+		if err != nil {
+			log.Printf("%+v", err)
+			status.SetStatus(status.SystemStatusKAT500, status.StatusFailed)
+			return m.ctrl.reconnect(m.quit)
+		}
+	}
+
+	if b != m.band {
+		m.band = b
+
+		err = m.ctrl.withCommand(func(cmd *command) error {
+			if err := cmd.updateKPA500Band(); err != nil {
+				return err
+			}
+			return cmd.updateRadioRFPower()
+		})
+		if err != nil {
+			log.Printf("%+v", err)
+			status.SetStatus(status.SystemStatusKPA500, status.StatusFailed)
+			status.SetStatus(status.SystemStatusRadio, status.StatusFailed)
+			return m.ctrl.reconnect(m.quit)
+		}
+	}
+
+	return true
+}
+
+func (m *monitor) pollKAT() bool {
+	err := m.ctrl.tryPollKAT(func(cmd *command) error {
+		f, err := cmd.getKAT500InFault()
+		if err != nil {
+			return err
+		}
+		if f {
+			status.SetStatus(status.SystemStatusKAT500, status.StatusFailed)
+			return nil
+		}
+
+		v, err := cmd.getKAT500VSWR()
+		if err != nil {
+			return err
+		}
+
+		data.KAT500{VSWR: v}.Update()
+		status.SetStatus(status.SystemStatusKAT500, status.StatusOK)
+		return nil
+	})
+	if err != nil {
+		log.Printf("%+v", err)
+		status.SetStatus(status.SystemStatusKAT500, status.StatusFailed)
+		return m.ctrl.reconnect(m.quit)
+	}
+	return true
+}
+
+func (m *monitor) pollKPA() bool {
+	err := m.ctrl.tryPollKPA(func(cmd *command) error {
+		f, err := cmd.getKPA500InFault()
+		if err != nil {
+			return err
+		}
+		if f {
+			status.SetStatus(status.SystemStatusKPA500, status.StatusFailed)
+			return nil
+		}
+
+		p, err := cmd.getKPA500Power()
+		if err != nil {
+			return err
+		}
+
+		v, a, err := cmd.getKPA500PAVoltsCurrent()
+		if err != nil {
+			return err
+		}
+
+		data.KPA500{
+			Mode:    -1,
+			Power:   p,
+			PAVolts: v,
+			PAAmps:  a,
+		}.Update()
+		status.SetStatus(status.SystemStatusKPA500, status.StatusOK)
+		return nil
+	})
+	if err != nil {
+		log.Printf("%+v", err)
+		status.SetStatus(status.SystemStatusKPA500, status.StatusFailed)
+		return m.ctrl.reconnect(m.quit)
+	}
+	return true
 }
 
 // initializeDevices makes sure the internal state is consistent with external devices
