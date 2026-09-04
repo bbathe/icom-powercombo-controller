@@ -9,14 +9,14 @@ import (
 
 	"github.com/bbathe/icom-powercombo-controller/util"
 
-	"github.com/albenik/go-serial/v2"
+	"go.bug.st/serial"
 )
 
 type KPA500 struct {
 	Port string
 	Baud int
 
-	p         *serial.Port
+	p         serial.Port
 	mutexPort sync.Mutex
 	closed    util.AtomFlag
 }
@@ -40,11 +40,7 @@ var (
 
 // OpenKPA500 creates a connection with the KPA500
 func OpenKPA500(port string, baud int) (*KPA500, error) {
-	p, err := serial.Open(port,
-		serial.WithBaudrate(baud),
-		serial.WithReadTimeout(333),
-		serial.WithWriteTimeout(333),
-	)
+	p, err := openSerialPort(port, baud)
 	if err != nil {
 		log.Printf("%+v", err)
 		return nil, err

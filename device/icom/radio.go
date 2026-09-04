@@ -7,10 +7,11 @@ import (
 	"log"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/bbathe/icom-powercombo-controller/util"
 
-	"github.com/albenik/go-serial/v2"
+	"go.bug.st/serial"
 )
 
 type Radio struct {
@@ -18,7 +19,7 @@ type Radio struct {
 	Baud    int
 	Address string
 
-	p         *serial.Port
+	p         serial.Port
 	mutexPort sync.Mutex
 	f         bool
 	closed    util.AtomFlag
@@ -30,11 +31,7 @@ var (
 
 // OpenRadio creates a connection with the radio
 func OpenRadio(port string, baud int, address string) (*Radio, error) {
-	p, err := serial.Open(port,
-		serial.WithBaudrate(baud),
-		serial.WithReadTimeout(333),
-		serial.WithWriteTimeout(333),
-	)
+	p, err := openSerialPort(port, baud)
 	if err != nil {
 		log.Printf("%+v", err)
 		return nil, err
@@ -47,6 +44,18 @@ func OpenRadio(port string, baud int, address string) (*Radio, error) {
 	r.p = p
 
 	return r, nil
+}
+
+func openSerialPort(name string, baud int) (serial.Port, error) {
+	p, err := serial.Open(name, &serial.Mode{BaudRate: baud})
+	if err != nil {
+		return nil, err
+	}
+	if err := p.SetReadTimeout(333 * time.Millisecond); err != nil {
+		_ = p.Close()
+		return nil, err
+	}
+	return p, nil
 }
 
 // Close closes the connection with the radio

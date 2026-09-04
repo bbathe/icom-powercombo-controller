@@ -2,12 +2,27 @@ package elecraft
 
 import (
 	"bytes"
+	"time"
 
-	"github.com/albenik/go-serial/v2"
+	"go.bug.st/serial"
 )
 
+const readTimeout = 333 * time.Millisecond
+
+func openSerialPort(name string, baud int) (serial.Port, error) {
+	p, err := serial.Open(name, &serial.Mode{BaudRate: baud})
+	if err != nil {
+		return nil, err
+	}
+	if err := p.SetReadTimeout(readTimeout); err != nil {
+		_ = p.Close()
+		return nil, err
+	}
+	return p, nil
+}
+
 // readMessageFromPort reads a KPA500/KAT500 formatted message from port p
-func readMessageFromPort(p *serial.Port) (string, error) {
+func readMessageFromPort(p serial.Port) (string, error) {
 	var buf bytes.Buffer
 	b := []byte{0}
 
@@ -35,8 +50,7 @@ func readMessageFromPort(p *serial.Port) (string, error) {
 }
 
 // writeMessageToPort writes a KPA500/KAT500 formatted message to port p
-func writeMessageToPort(p *serial.Port, msg string) error {
-	// write to port
+func writeMessageToPort(p serial.Port, msg string) error {
 	_, err := p.Write([]byte(msg))
 	if err != nil {
 		return err
