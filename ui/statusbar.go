@@ -55,38 +55,41 @@ func statusImage(s status.StatusValue) walk.Image {
 
 // updateStatuses is the StatusChangeEventHandler
 func updateStatuses(statuses []status.StatusValue) {
-	if ivRadio != nil {
-		err := ivRadio.SetImage(statusImage(statuses[status.SystemStatusRadio]))
-		if err != nil {
-			log.Printf("%+v", err)
-			return
-		}
-	}
+	// copy for the UI thread; publisher may reuse/replace the slice later
+	snapshot := append([]status.StatusValue(nil), statuses...)
 
-	if ivKAT500 != nil {
-		err := ivKAT500.SetImage(statusImage(statuses[status.SystemStatusKAT500]))
-		if err != nil {
-			log.Printf("%+v", err)
-			return
+	uiOnMain(func() {
+		if ivRadio != nil {
+			err := ivRadio.SetImage(statusImage(snapshot[status.SystemStatusRadio]))
+			if err != nil {
+				log.Printf("%+v", err)
+				return
+			}
 		}
-	}
 
-	if ivKPA500 != nil {
-		err := ivKPA500.SetImage(statusImage(statuses[status.SystemStatusKPA500]))
-		if err != nil {
-			log.Printf("%+v", err)
-			return
+		if ivKAT500 != nil {
+			err := ivKAT500.SetImage(statusImage(snapshot[status.SystemStatusKAT500]))
+			if err != nil {
+				log.Printf("%+v", err)
+				return
+			}
 		}
-	}
 
-	// flash window if any status is failed
-	for _, s := range statuses {
-		if s == status.StatusFailed {
-			flashWindow(mainWin, 3)
-			break
+		if ivKPA500 != nil {
+			err := ivKPA500.SetImage(statusImage(snapshot[status.SystemStatusKPA500]))
+			if err != nil {
+				log.Printf("%+v", err)
+				return
+			}
 		}
-	}
 
+		for _, s := range snapshot {
+			if s == status.StatusFailed {
+				flashWindow(mainWin, 3)
+				break
+			}
+		}
+	})
 }
 
 // statusBar returns a Composite that has all the controls & logic for displaying status on the main UI

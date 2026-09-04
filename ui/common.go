@@ -79,3 +79,12 @@ func flashWindow(parent *walk.MainWindow, times uint32) {
 
 	_, _, _ = flashWindowEx.Call(uintptr(unsafe.Pointer(&fw)))
 }
+
+// uiOnMain runs fn on the main window UI thread.
+func uiOnMain(fn func()) {
+	if mainWin == nil || fn == nil {
+		return
+	}
+	mainWin.Synchronize(fn)
+}
+

@@ -49,9 +49,12 @@ func Detach(handle int) {
 }
 
 func publishTaskStatusChange() {
+	snapshot := make([]StatusValue, len(statuses))
+	copy(snapshot, statuses[:])
+
 	for _, h := range statusHandlers {
 		if h != nil {
-			go h(statuses[:])
+			go h(snapshot)
 		}
 	}
 }

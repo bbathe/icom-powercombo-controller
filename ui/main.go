@@ -258,22 +258,24 @@ func MainWindow() error {
 
 	// update controls with data from devices
 	hDataChangeHandler = data.Attach(func(d data.Data) {
-		err := tlWatts.SetText(fmt.Sprintf("%d w", d.KPA500.Power))
-		if err != nil {
-			log.Printf("%+v", err)
-		}
-		err = tlVolts.SetText(fmt.Sprintf("%.1f v", d.KPA500.PAVolts))
-		if err != nil {
-			log.Printf("%+v", err)
-		}
-		err = tlAmps.SetText(fmt.Sprintf("%.1f a", d.KPA500.PAAmps))
-		if err != nil {
-			log.Printf("%+v", err)
-		}
-		err = tlVSWR.SetText(fmt.Sprintf("%.2f vswr", d.KAT500.VSWR))
-		if err != nil {
-			log.Printf("%+v", err)
-		}
+		uiOnMain(func() {
+			err := tlWatts.SetText(fmt.Sprintf("%d w", d.KPA500.Power))
+			if err != nil {
+				log.Printf("%+v", err)
+			}
+			err = tlVolts.SetText(fmt.Sprintf("%.1f v", d.KPA500.PAVolts))
+			if err != nil {
+				log.Printf("%+v", err)
+			}
+			err = tlAmps.SetText(fmt.Sprintf("%.1f a", d.KPA500.PAAmps))
+			if err != nil {
+				log.Printf("%+v", err)
+			}
+			err = tlVSWR.SetText(fmt.Sprintf("%.2f vswr", d.KAT500.VSWR))
+			if err != nil {
+				log.Printf("%+v", err)
+			}
+		})
 	})
 
 	// disable maximize and resizing
