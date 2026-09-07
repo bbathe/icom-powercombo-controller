@@ -27,11 +27,17 @@ type Radio struct {
 
 var (
 	errPortClosed = fmt.Errorf("port closed")
+
+	// civMu serializes all CI-V traffic across monitor and command ports.
+	// Those ports usually share one CI-V bus; concurrent writes (e.g. RF power
+	// vs frequency poll) can be misparsed by the radio as a VFO frequency set.
+	civMu sync.Mutex
 )
 
 const (
 	readTimeout  = 333 * time.Millisecond
 	responseWait = 3 * time.Second
+	maxCIVFrame  = 64
 )
 
 // OpenRadio creates a connection with the radio
@@ -73,10 +79,22 @@ func (r *Radio) Close() error {
 	return r.p.Close()
 }
 
-// readCIVMessageFromPort reads bytes from port and returns CIV message
+// lockCIV acquires the shared bus lock then the per-port lock.
+func (r *Radio) lockCIV() {
+	civMu.Lock()
+	r.mutexPort.Lock()
+}
+
+func (r *Radio) unlockCIV() {
+	r.mutexPort.Unlock()
+	civMu.Unlock()
+}
+
+// readCIVMessageFromPort reads one CI-V frame (FE FE … FD), discarding leading noise.
 func (r *Radio) readCIVMessageFromPort() ([]byte, error) {
 	var buf bytes.Buffer
 	b := []byte{0}
+	preamble := 0 // 0 = hunting first FE, 1 = hunting second FE, 2 = in frame
 
 	for {
 		n, err := r.p.Read(b)
@@ -88,22 +106,40 @@ func (r *Radio) readCIVMessageFromPort() ([]byte, error) {
 			return []byte{}, err
 		}
 
-		if n > 0 {
-			// accumulate message bytes
-			buf.Write(b)
+		if n == 0 {
+			// read timeout — drop a partial frame rather than returning mid-message junk
+			return []byte{}, nil
+		}
 
-			// message terminator?
+		switch preamble {
+		case 0:
+			if b[0] == 0xFE {
+				buf.WriteByte(0xFE)
+				preamble = 1
+			}
+		case 1:
+			if b[0] == 0xFE {
+				buf.WriteByte(0xFE)
+				preamble = 2
+			} else {
+				buf.Reset()
+				preamble = 0
+				if b[0] == 0xFE {
+					buf.WriteByte(0xFE)
+					preamble = 1
+				}
+			}
+		default:
+			buf.WriteByte(b[0])
 			if b[0] == 0xFD {
-				// return CIV message
 				return buf.Bytes(), nil
 			}
-		} else {
-			break
+			if buf.Len() > maxCIVFrame {
+				buf.Reset()
+				preamble = 0
+			}
 		}
 	}
-
-	// return message
-	return buf.Bytes(), nil
 }
 
 // writeCIVMessageToPort write byte equalivalent of msg to port
@@ -131,8 +167,8 @@ func (r *Radio) writeCIVMessageToPort(msg string) error {
 // QueryFrequency sends CI-V command 03 and waits up to responseWait for a frequency reply.
 // Returns -1, nil when the radio does not answer (powered off / unplugged CI-V).
 func (r *Radio) QueryFrequency() (int64, error) {
-	r.mutexPort.Lock()
-	defer r.mutexPort.Unlock()
+	r.lockCIV()
+	defer r.unlockCIV()
 
 	err := r.writeCIVMessageToPort(fmt.Sprintf("FEFE%sE003FD", r.Address))
 	if err != nil {
@@ -165,8 +201,8 @@ func (r *Radio) QueryFrequency() (int64, error) {
 // it does this by polling for the "Transfer operating frequency data" broadcast message
 // if port is closed during reading, -1 is returned
 func (r *Radio) GetFrequency() (int64, error) {
-	r.mutexPort.Lock()
-	defer r.mutexPort.Unlock()
+	r.lockCIV()
+	defer r.unlockCIV()
 
 	if !r.f {
 		// first time after connecting to radio, query for frequency
@@ -200,16 +236,26 @@ func (r *Radio) GetFrequency() (int64, error) {
 }
 
 func parseOperatingFrequency(msg []byte) (int64, bool) {
-	// is it operating frequency data?
-	if len(msg) != 11 || (msg[2] != 0xE0 && msg[2] != 0x00) {
+	// FE FE <to> <from> <cmd> <5 BCD freq bytes> FD
+	// cmd 00 = operating/transceive frequency, 03 = reply to frequency read
+	if len(msg) != 11 || msg[0] != 0xFE || msg[1] != 0xFE || msg[10] != 0xFD {
 		return 0, false
 	}
+	if msg[2] != 0xE0 && msg[2] != 0x00 {
+		return 0, false
+	}
+	if msg[4] != 0x00 && msg[4] != 0x03 {
+		return 0, false
+	}
+	for _, b := range msg[5:10] {
+		if b&0x0f > 9 || b>>4 > 9 {
+			return 0, false
+		}
+	}
 
-	// radio sends as least significant byte first, flip order of bytes
 	fd := fmt.Sprintf("%02X%02X%02X%02X%02X", msg[9], msg[8], msg[7], msg[6], msg[5])
-
 	freq, err := strconv.ParseInt(fd, 10, 64)
-	if err != nil {
+	if err != nil || freq <= 0 {
 		return 0, false
 	}
 	return freq, true
@@ -217,8 +263,8 @@ func parseOperatingFrequency(msg []byte) (int64, bool) {
 
 // SetRFPower sets the RF Power of the radio
 func (r *Radio) SetRFPower(power int) error {
-	r.mutexPort.Lock()
-	defer r.mutexPort.Unlock()
+	r.lockCIV()
+	defer r.unlockCIV()
 
 	// calculate radio power setting from percentage
 	p := RFPowerToCIV(power)
@@ -245,7 +291,7 @@ func (r *Radio) SetRFPower(power int) error {
 		}
 
 		// response for us from radio?
-		if len(msg) == 6 && msg[2] == 0xE0 {
+		if len(msg) == 6 && msg[0] == 0xFE && msg[1] == 0xFE && msg[2] == 0xE0 && msg[5] == 0xFD {
 			// check status returned from radio
 			if msg[4] != 0xFB {
 				err = fmt.Errorf("error response from radio")

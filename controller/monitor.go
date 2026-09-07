@@ -178,12 +178,13 @@ func (m *monitor) stepRadio() bool {
 		return true
 	}
 
-	m.freq = f
-
 	b, err := util.BandFromFrequency(f)
 	if err != nil {
+		// ignore out-of-band / garbage parses; do not adopt them as current freq
 		return true
 	}
+
+	m.freq = f
 
 	data.Radio{
 		Frequency: f,
