@@ -52,9 +52,12 @@ func publishTaskStatusChange() {
 	snapshot := make([]StatusValue, len(statuses))
 	copy(snapshot, statuses[:])
 
+	// Call handlers synchronously so consecutive SetStatus updates keep order.
+	// Handlers must not block: UI work should be posted (e.g. Synchronize).
+	// Publishing with `go` raced and could apply an older snapshot last (KPA stuck gray).
 	for _, h := range statusHandlers {
 		if h != nil {
-			go h(snapshot)
+			h(snapshot)
 		}
 	}
 }
@@ -80,4 +83,14 @@ func SetStatuses(s StatusValue) {
 		statuses[t] = s
 	}
 	publishTaskStatusChange()
+}
+
+// Snapshot returns a copy of the current status values.
+func Snapshot() []StatusValue {
+	mutexStatuses.Lock()
+	defer mutexStatuses.Unlock()
+
+	out := make([]StatusValue, len(statuses))
+	copy(out, statuses[:])
+	return out
 }

@@ -60,26 +60,20 @@ func updateStatuses(statuses []status.StatusValue) {
 
 	uiOnMain(func() {
 		if ivRadio != nil {
-			err := ivRadio.SetImage(statusImage(snapshot[status.SystemStatusRadio]))
-			if err != nil {
+			if err := ivRadio.SetImage(statusImage(snapshot[status.SystemStatusRadio])); err != nil {
 				log.Printf("%+v", err)
-				return
 			}
 		}
 
 		if ivKAT500 != nil {
-			err := ivKAT500.SetImage(statusImage(snapshot[status.SystemStatusKAT500]))
-			if err != nil {
+			if err := ivKAT500.SetImage(statusImage(snapshot[status.SystemStatusKAT500])); err != nil {
 				log.Printf("%+v", err)
-				return
 			}
 		}
 
 		if ivKPA500 != nil {
-			err := ivKPA500.SetImage(statusImage(snapshot[status.SystemStatusKPA500]))
-			if err != nil {
+			if err := ivKPA500.SetImage(statusImage(snapshot[status.SystemStatusKPA500])); err != nil {
 				log.Printf("%+v", err)
-				return
 			}
 		}
 
@@ -90,6 +84,11 @@ func updateStatuses(statuses []status.StatusValue) {
 			}
 		}
 	})
+}
+
+// syncStatusBar applies the current status package state to the LEDs.
+func syncStatusBar() {
+	updateStatuses(status.Snapshot())
 }
 
 // statusBar returns a Composite that has all the controls & logic for displaying status on the main UI

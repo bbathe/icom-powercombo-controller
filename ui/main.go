@@ -370,6 +370,7 @@ func MainWindow() error {
 				log.Printf("%+v", err)
 				ctrl = nil
 			}
+			syncStatusBar()
 		}()
 	}
 
@@ -409,6 +410,7 @@ func updateConfig(p *walk.MainWindow, configFile string) {
 		log.Printf("%+v", err)
 		ctrl = nil
 	}
+	syncStatusBar()
 }
 
 // determineConfigFile returns the configuration file to use based on whether user passed one on the commandline
